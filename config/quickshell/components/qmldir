@@ -1,0 +1,5 @@
+module components
+
+BarButton 1.0 BarButton.qml
+AudioButton 1.0 AudioButton.qml
+Tray 1.0 Tray.qml

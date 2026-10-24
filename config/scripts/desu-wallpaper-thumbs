@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# List wallpapers and emit cheap cached thumbnails for the Quickshell selector.
+#
+# Output is one record per line: <original path><TAB><thumbnail path>
+# Thumbnails are keyed by path + mtime + size, so changed images invalidate
+# automatically. Only visible grid cells are decoded by QML.
+
+set -uo pipefail
+
+# shellcheck source=desu-lib.sh
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/desu-lib.sh"
+desu_load_settings
+desu_ensure_dirs
+
+dir=${DESU_WALLPAPER_DIR:-}
+cache="${DESU_CACHE_HOME}/wallpapers"
+
+if [[ ! -d $dir ]]; then
+    exit 0
+fi
+
+mkdir -p "$cache"
+chmod 700 "$cache" 2>/dev/null || true
+
+# Remove thumbnails that have not been touched in a week. The content key also
+# prevents stale images from being reused.
+find "$cache" -type f -name '*.jpg' -mtime +7 -delete 2>/dev/null || true
+
+hash_cmd=md5sum
+desu_have md5sum || hash_cmd=sha256sum
+
+while IFS= read -r -d '' path; do
+    [[ -f $path ]] || continue
+    rel=${path#"$dir"/}
+    meta=$(stat -c '%Y %s' -- "$path" 2>/dev/null) || continue
+    mtime=${meta%% *}
+    size=${meta##* }
+    key=$(printf '%s' "$path" | "$hash_cmd" | cut -d' ' -f1)
+    thumb="${cache}/${key}-${mtime}-${size}.jpg"
+
+    if [[ ! -s $thumb ]]; then
+        if desu_have magick; then
+            tmp="${thumb}.tmp.$$"
+            if magick "${path}[0]" -auto-orient -thumbnail '320x180^' \
+                    -gravity center -extent 320x180 -quality 80 "$tmp" 2>/dev/null; then
+                mv -f "$tmp" "$thumb"
+            else
+                rm -f "$tmp"
+                thumb=$path
+            fi
+        elif desu_have convert; then
+            tmp="${thumb}.tmp.$$"
+            if convert "${path}[0]" -auto-orient -thumbnail '320x180^' \
+                    -gravity center -extent 320x180 -quality 80 "$tmp" 2>/dev/null; then
+                mv -f "$tmp" "$thumb"
+            else
+                rm -f "$tmp"
+                thumb=$path
+            fi
+        else
+            # QML Image with sourceSize will still avoid a full-size decode
+            # where the image format supports it.
+            thumb=$path
+        fi
+    fi
+
+    printf '%s\t%s\t%s\n' "$path" "$thumb" "$rel"
+done < <(find "$dir" -maxdepth 1 -type f \
+    \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \
+       -o -iname '*.gif' -o -iname '*.bmp' -o -iname '*.tif' -o -iname '*.tiff' \
+       -o -iname '*.avif' -o -iname '*.jxl' \) -print0 | sort -z)

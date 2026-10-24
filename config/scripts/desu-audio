@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Open the full audio mixer. Volume changes are handled natively by Quickshell
+# through PipeWire; this script is only the "full mixer" affordance.
+
+set -uo pipefail
+
+if ! command -v pavucontrol >/dev/null 2>&1; then
+    printf 'desu-audio: pavucontrol is not installed\n' >&2
+    exit 127
+fi
+
+exec pavucontrol "$@"

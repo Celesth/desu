@@ -1,0 +1,298 @@
+#!/usr/bin/env bash
+# DESU screen recorder controller.
+#
+# Backends:
+#   gpu-screen-recorder  preferred, uses the GPU when the installed build works
+#   wf-recorder         fallback for wlroots-compatible compositors
+#
+# State is stored under $XDG_RUNTIME_DIR/desu so the shell and CLI see the
+# same recording. No shell daemon is involved.
+
+set -uo pipefail
+
+# shellcheck source=desu-lib.sh
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/desu-lib.sh"
+desu_load_settings
+desu_ensure_dirs
+
+PROG=desu-recorder
+umask 077
+
+die() { printf '%s: %s\n' "$PROG" "$*" >&2; exit 1; }
+
+now_epoch() { date +%s; }
+
+write_state() {
+    local state=$1 backend=${2:-} pid=${3:-} output=${4:-} started=${5:-} error=${6:-}
+    local tmp="${DESU_RECORDER_STATE}.tmp.$$"
+    {
+        printf 'state=%s\n' "$state"
+        printf 'backend=%s\n' "$backend"
+        printf 'pid=%s\n' "$pid"
+        printf 'output=%s\n' "$output"
+        printf 'started=%s\n' "$started"
+        printf 'error=%s\n' "$error"
+    } >"$tmp"
+    mv -f "$tmp" "$DESU_RECORDER_STATE"
+}
+
+state_value() {
+    local key=$1
+    [[ -r $DESU_RECORDER_STATE ]] || return 1
+    sed -n "s/^${key}=//p" "$DESU_RECORDER_STATE" | head -n 1
+}
+
+lock() {
+    if desu_have flock; then
+        exec 9>"$DESU_RECORDER_LOCK"
+        flock -n 9 || die "another recorder operation is in progress"
+    fi
+}
+
+backend_available() {
+    local backend=$1
+    case "$backend" in
+        gpu-screen-recorder)
+            desu_have gpu-screen-recorder || return 1
+            gpu-screen-recorder --version >/dev/null 2>&1 || return 1
+            # The command can exist but have no usable capture backend.
+            [[ -n $(gpu-screen-recorder --list-monitors 2>/dev/null) ]] || return 1
+            ;;
+        wf-recorder)
+            desu_have wf-recorder || return 1
+            wf-recorder --version >/dev/null 2>&1 || return 1
+            # Version output alone does not prove that a wlroots compositor is
+            # reachable. Listing outputs is a cheap capability check.
+            [[ -n $(wf-recorder --list-output 2>/dev/null) ]] || return 1
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+select_backend() {
+    local wanted=${DESU_RECORDER_BACKEND:-auto}
+    if [[ $wanted != auto ]]; then
+        backend_available "$wanted" || die "recording backend '$wanted' is not available or not usable"
+        printf '%s\n' "$wanted"
+        return
+    fi
+    if backend_available gpu-screen-recorder; then
+        printf 'gpu-screen-recorder\n'
+    elif backend_available wf-recorder; then
+        printf 'wf-recorder\n'
+    else
+        return 1
+    fi
+}
+
+recorder_pid() {
+    local pid
+    pid=$(state_value pid) || return 1
+    [[ $pid =~ ^[0-9]+$ ]] || return 1
+    desu_pid_alive "$pid" || return 1
+    printf '%s\n' "$pid"
+}
+
+stop_pid() {
+    local pid=$1 i
+    # The backend is started in its own session, so signal the group first to
+    # also finalize any encoder child process.
+    kill -INT -- "-$pid" 2>/dev/null || kill -INT "$pid" 2>/dev/null || true
+    for i in {1..60}; do
+        desu_pid_alive "$pid" || return 0
+        sleep 0.1
+    done
+    kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+    for i in {1..20}; do
+        desu_pid_alive "$pid" || return 0
+        sleep 0.1
+    done
+    kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+    sleep 0.1
+    ! desu_pid_alive "$pid"
+}
+
+last_log_line() {
+    [[ -r ${DESU_STATE_HOME}/recorder.log ]] || return 0
+    tail -n 1 "${DESU_STATE_HOME}/recorder.log" | tr -d '\r'
+}
+
+start_recording() {
+    lock
+    local existing
+    if existing=$(recorder_pid); then
+        die "already recording (pid $existing)"
+    fi
+
+    local backend outdir output started
+    backend=$(select_backend) || die "no usable recording backend found (install gpu-screen-recorder or wf-recorder)"
+
+    outdir=${DESU_RECORDER_OUTPUT_DIR:-${HOME}/Videos/Recordings}
+    mkdir -p "$outdir" || die "cannot create output directory: $outdir"
+    [[ -w $outdir ]] || die "output directory is not writable: $outdir"
+    output="${outdir}/recording-$(date +%Y%m%d-%H%M%S).mp4"
+
+    local -a cmd
+    local -a extra=()
+    if [[ -n ${DESU_RECORDER_OPTIONS:-} ]]; then
+        # Documented as an advanced escape hatch; word splitting is intended.
+        # shellcheck disable=SC2206
+        extra=(${DESU_RECORDER_OPTIONS})
+    fi
+
+    case "$backend" in
+        gpu-screen-recorder)
+            cmd=(gpu-screen-recorder -w focused -f "${DESU_RECORDER_FPS:-60}" -q "${DESU_RECORDER_QUALITY:-very_high}")
+            [[ ${DESU_RECORDER_AUDIO:-1} == 1 ]] && cmd+=(-a default_output)
+            cmd+=("${extra[@]}" -o "$output")
+            ;;
+        wf-recorder)
+            cmd=(wf-recorder -f "$output" -r "${DESU_RECORDER_FPS:-60}")
+            [[ ${DESU_RECORDER_AUDIO:-1} == 1 ]] && cmd+=(-a)
+            cmd+=("${extra[@]}")
+            ;;
+    esac
+
+    : >"${DESU_STATE_HOME}/recorder.log"
+    setsid "${cmd[@]}" >>"${DESU_STATE_HOME}/recorder.log" 2>&1 </dev/null &
+    local pid=$!
+    printf '%s\n' "$pid" >"$DESU_RECORDER_PIDFILE"
+    started=$(now_epoch)
+
+    sleep 0.35
+    if ! desu_pid_alive "$pid"; then
+        local err
+        err=$(last_log_line)
+        write_state failed "$backend" "" "$output" "$started" "${err:-backend exited immediately}"
+        rm -f "$DESU_RECORDER_PIDFILE"
+        die "failed to start $backend${err:+: $err}"
+    fi
+
+    write_state recording "$backend" "$pid" "$output" "$started" ""
+    printf 'recording with %s -> %s (pid %s)\n' "$backend" "$output" "$pid"
+}
+
+stop_recording() {
+    lock
+    local pid state
+    state=$(state_value state || true)
+    if ! pid=$(recorder_pid); then
+        if [[ $state == recording ]]; then
+            local err
+            err=$(last_log_line)
+            write_state failed "$(state_value backend || true)" "" \
+                "$(state_value output || true)" "$(state_value started || true)" \
+                "${err:-recorder exited unexpectedly}"
+        fi
+        rm -f "$DESU_RECORDER_PIDFILE"
+        printf 'not recording\n'
+        return 0
+    fi
+
+    local output backend started
+    output=$(state_value output || true)
+    backend=$(state_value backend || true)
+    started=$(state_value started || true)
+
+    if ! stop_pid "$pid"; then
+        write_state failed "$backend" "" "$output" "$started" "failed to stop recorder (pid $pid)"
+        rm -f "$DESU_RECORDER_PIDFILE"
+        die "failed to stop recorder (pid $pid)"
+    fi
+
+    rm -f "$DESU_RECORDER_PIDFILE"
+    write_state idle "$backend" "" "$output" "$started" ""
+    printf 'recording stopped: %s\n' "${output:-unknown output}"
+}
+
+refresh_state() {
+    local state pid
+    state=$(state_value state || true)
+    [[ $state == recording ]] || return 0
+    if ! pid=$(recorder_pid); then
+        local err
+        err=$(last_log_line)
+        write_state failed "$(state_value backend || true)" "" \
+            "$(state_value output || true)" "$(state_value started || true)" \
+            "${err:-recorder exited unexpectedly}"
+        rm -f "$DESU_RECORDER_PIDFILE"
+    fi
+}
+
+print_status() {
+    refresh_state
+    local state backend pid output started error elapsed
+    state=$(state_value state || echo idle)
+    backend=$(state_value backend || true)
+    pid=$(state_value pid || true)
+    output=$(state_value output || true)
+    started=$(state_value started || true)
+    error=$(state_value error || true)
+
+    elapsed=0
+    if [[ $state == recording && $started =~ ^[0-9]+$ ]]; then
+        elapsed=$(( $(now_epoch) - started ))
+    fi
+
+    local field=${1:-}
+    case "$field" in
+        state)   printf '%s\n' "$state"; return 0 ;;
+        backend) printf '%s\n' "$backend"; return 0 ;;
+        pid)     printf '%s\n' "$pid"; return 0 ;;
+        output)  printf '%s\n' "$output"; return 0 ;;
+        elapsed) printf '%s\n' "$elapsed"; return 0 ;;
+        error)   printf '%s\n' "$error"; return 0 ;;
+    esac
+
+    printf 'state:   %s\n' "$state"
+    printf 'backend: %s\n' "${backend:-none}"
+    [[ -n $pid ]] && printf 'pid:     %s\n' "$pid"
+    [[ -n $output ]] && printf 'output:  %s\n' "$output"
+    [[ $state == recording ]] && printf 'elapsed: %02d:%02d:%02d\n' $((elapsed/3600)) $(((elapsed%3600)/60)) $((elapsed%60))
+    [[ -n $error ]] && printf 'error:   %s\n' "$error"
+    [[ $state == failed ]] && return 1
+    return 0
+}
+
+backend_report() {
+    local b
+    for b in gpu-screen-recorder wf-recorder; do
+        if backend_available "$b"; then
+            printf '%s: available\n' "$b"
+        else
+            printf '%s: unavailable\n' "$b"
+        fi
+    done
+    printf 'selected: %s\n' "$(select_backend 2>/dev/null || echo none)"
+}
+
+case "${1:-}" in
+    start)  start_recording ;;
+    stop)   stop_recording ;;
+    toggle)
+        if recorder_pid >/dev/null; then stop_recording; else start_recording; fi
+        ;;
+    status)
+        shift || true
+        if [[ ${1:-} == --field ]]; then
+            print_status "${2:-}"
+        else
+            print_status
+        fi
+        ;;
+    backends) backend_report ;;
+    *)
+        cat <<EOF
+usage: desu-recorder <start|stop|toggle|status|backends>
+
+Environment / ~/.config/desu/config:
+  DESU_RECORDER_BACKEND      auto, gpu-screen-recorder, or wf-recorder
+  DESU_RECORDER_OUTPUT_DIR   output directory
+  DESU_RECORDER_FPS          frame rate (default 60)
+  DESU_RECORDER_AUDIO        1 to capture desktop audio, 0 to disable
+  DESU_RECORDER_QUALITY      gpu-screen-recorder quality
+  DESU_RECORDER_OPTIONS      extra backend arguments (advanced)
+EOF
+        exit 2
+        ;;
+esac

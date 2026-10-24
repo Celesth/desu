@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# DESU application and desktop action launcher.
+
+set -uo pipefail
+
+# shellcheck source=desu-lib.sh
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/desu-lib.sh"
+desu_load_settings
+
+if ! desu_have fuzzel; then
+    printf 'desu-launcher: fuzzel is not installed\n' >&2
+    exit 127
+fi
+
+case "${1:-apps}" in
+    apps)
+        exec fuzzel --config "$DESU_FUZZEL_CONFIG"
+        ;;
+    actions|menu)
+        choice=$(printf '%s\n' \
+            'APPLICATIONS' \
+            'CLIPBOARD HISTORY' \
+            'WALLPAPER SELECTOR' \
+            'SCREEN RECORDER' \
+            'AUDIO MIXER' \
+            'NOTIFICATIONS' |
+            fuzzel --dmenu --prompt 'desu > ' --config "$DESU_FUZZEL_CONFIG" 2>/dev/null) || exit 0
+        case "$choice" in
+            APPLICATIONS) exec "$0" apps ;;
+            'CLIPBOARD HISTORY') exec "${DESU_SCRIPTS_DIR}/desu-clipboard" show ;;
+            'WALLPAPER SELECTOR') exec desu wallpaper select ;;
+            'SCREEN RECORDER') exec desu recorder toggle ;;
+            'AUDIO MIXER') exec "${DESU_SCRIPTS_DIR}/desu-audio" ;;
+            'NOTIFICATIONS') exec desu ipc call desu notificationToggle ;;
+        esac
+        ;;
+    *)
+        printf 'desu-launcher: usage: desu-launcher [apps|actions]\n' >&2
+        exit 2
+        ;;
+esac

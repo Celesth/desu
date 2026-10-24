@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# DESU wallpaper backend abstraction.
+#
+# Supported backends (auto-detected in this order):
+#   awww       preferred when awww + awww-daemon are installed
+#   swww       compatible alternative
+#   hyprpaper  only if an existing hyprpaper instance is running
+#
+# The selected path is persisted in $XDG_STATE_HOME/desu/wallpaper.
+
+set -uo pipefail
+
+# shellcheck source=desu-lib.sh
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/desu-lib.sh"
+desu_load_settings
+desu_ensure_dirs
+
+PROG=desu-wallpaper
+umask 077
+
+die() { printf '%s: %s\n' "$PROG" "$*" >&2; exit 1; }
+
+is_image() {
+    local path=$1 mime
+    [[ -f $path ]] || return 1
+    if desu_have file; then
+        mime=$(file -b --mime-type -- "$path" 2>/dev/null || true)
+        [[ $mime == image/* ]] && return 0
+        return 1
+    fi
+    case "${path,,}" in
+        *.jpg|*.jpeg|*.png|*.webp|*.gif|*.bmp|*.tif|*.tiff|*.avif|*.jxl) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+awww_ready() {
+    desu_have awww && desu_have awww-daemon && timeout 2s awww query >/dev/null 2>&1
+}
+
+ensure_awww_daemon() {
+    awww_ready && return 0
+    setsid awww-daemon >>"${DESU_STATE_HOME}/awww-daemon.log" 2>&1 </dev/null &
+    local i
+    for i in {1..30}; do
+        awww_ready && return 0
+        sleep 0.1
+    done
+    return 1
+}
+
+swww_ready() {
+    desu_have swww && desu_have swww-daemon && swww query >/dev/null 2>&1
+}
+
+ensure_swww_daemon() {
+    swww query >/dev/null 2>&1 && return 0
+    setsid swww-daemon >>"${DESU_STATE_HOME}/swww-daemon.log" 2>&1 </dev/null &
+    local i
+    for i in {1..30}; do
+        swww query >/dev/null 2>&1 && return 0
+        sleep 0.1
+    done
+    return 1
+}
+
+hyprpaper_ready() {
+    desu_have hyprpaper && desu_have hyprctl && hyprctl hyprpaper listloaded >/dev/null 2>&1
+}
+
+choose_backend() {
+    local wanted=${DESU_WALLPAPER_BACKEND:-auto}
+    case "$wanted" in
+        auto)
+            if [[ -x $(command -v awww 2>/dev/null) ]]; then
+                printf 'awww\n'
+            elif [[ -x $(command -v swww 2>/dev/null) ]]; then
+                printf 'swww\n'
+            elif [[ -x $(command -v hyprpaper 2>/dev/null) ]] && hyprpaper_ready; then
+                printf 'hyprpaper\n'
+            else
+                return 1
+            fi
+            ;;
+        awww|swww|hyprpaper) printf '%s\n' "$wanted" ;;
+        *) return 1 ;;
+    esac
+}
+
+apply_path() {
+    local path=$1 backend
+    is_image "$path" || die "not a readable image: $path"
+    path=$(readlink -f -- "$path")
+
+    backend=$(choose_backend) || die "no wallpaper backend available (install awww or swww, or run hyprpaper)"
+
+    case "$backend" in
+        awww)
+            ensure_awww_daemon || die "could not start awww-daemon"
+            timeout 10s awww img --transition-type none "$path" >>"${DESU_STATE_HOME}/wallpaper.log" 2>&1 \
+                || die "awww failed to apply: $path"
+            ;;
+        swww)
+            ensure_swww_daemon || die "could not start swww-daemon"
+            swww img --transition-type none "$path" >>"${DESU_STATE_HOME}/wallpaper.log" 2>&1 \
+                || die "swww failed to apply: $path"
+            ;;
+        hyprpaper)
+            hyprpaper_ready || die "hyprpaper is not running"
+            hyprctl hyprpaper wallpaper ",$path" >/dev/null 2>&1 \
+                || die "hyprpaper failed to apply: $path"
+            ;;
+    esac
+
+    printf '%s\n%s\n' "$path" "$backend" >"$DESU_WALLPAPER_STATE"
+    printf 'wallpaper set (%s): %s\n' "$backend" "$path"
+}
+
+list_images() {
+    local dir=${DESU_WALLPAPER_DIR:-}
+    [[ -d $dir ]] || die "wallpaper directory does not exist: $dir"
+    find "$dir" -maxdepth 1 -type f \
+        \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \
+           -o -iname '*.gif' -o -iname '*.bmp' -o -iname '*.tif' -o -iname '*.tiff' \
+           -o -iname '*.avif' -o -iname '*.jxl' \) -print0 |
+        sort -z | tr '\0' '\n'
+}
+
+show_status() {
+    local path backend available
+    path=$(sed -n '1p' "$DESU_WALLPAPER_STATE" 2>/dev/null || true)
+    backend=$(sed -n '2p' "$DESU_WALLPAPER_STATE" 2>/dev/null || true)
+    printf 'directory: %s\n' "${DESU_WALLPAPER_DIR:-unset}"
+    printf 'selected:  %s\n' "${path:-none}"
+    printf 'backend:   %s\n' "${backend:-none}"
+    if available=$(choose_backend); then
+        printf 'available: %s\n' "$available"
+    else
+        printf 'available: none\n'
+    fi
+}
+
+case "${1:-}" in
+    set)
+        [[ -n ${2:-} ]] || die "usage: desu-wallpaper set <image>"
+        apply_path "$2"
+        ;;
+    restore)
+        [[ -r $DESU_WALLPAPER_STATE ]] || die "no saved wallpaper"
+        path=$(sed -n '1p' "$DESU_WALLPAPER_STATE")
+        [[ -n $path ]] || die "saved wallpaper is empty"
+        apply_path "$path"
+        ;;
+    list)   list_images ;;
+    status) show_status ;;
+    backends)
+        if available=$(choose_backend); then printf 'available: %s\n' "$available"; else printf 'available: none\n'; fi
+        ;;
+    *)
+        cat <<EOF
+usage: desu-wallpaper <set <image>|restore|list|status|backends>
+
+Environment / ~/.config/desu/config:
+  DESU_WALLPAPER_DIR      directory browsed by the selector
+  DESU_WALLPAPER_BACKEND  auto, awww, swww, or hyprpaper
+EOF
+        exit 2
+        ;;
+esac

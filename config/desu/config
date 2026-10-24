@@ -1,0 +1,28 @@
+# DESU settings.
+#
+# This file is shell syntax and is sourced by the `desu` CLI before it launches
+# Quickshell. Environment variables with the same names take precedence, e.g.
+#   DESU_BAR_HEIGHT=34 desu start
+#
+# Paths may use $HOME or ~.
+
+# --- bar ---
+DESU_BAR_EDGE="top"          # top or bottom
+DESU_BAR_HEIGHT=28
+DESU_BAR_MARGIN=0
+DESU_FONT="Iosevka Nerd Font"
+DESU_FONT_SIZE=10
+DESU_TIME_FORMAT="HH:mm"
+DESU_DATE_FORMAT="ddd dd MMM yyyy"
+
+# --- wallpapers ---
+DESU_WALLPAPER_DIR="$HOME/Pictures/Wallpapers"
+DESU_WALLPAPER_BACKEND="awww" # awww is the DESU wallpaper backend
+
+# --- recorder ---
+DESU_RECORDER_BACKEND="auto"  # auto, gpu-screen-recorder, wf-recorder
+DESU_RECORDER_OUTPUT_DIR="$HOME/Videos/Recordings"
+DESU_RECORDER_FPS=60
+DESU_RECORDER_AUDIO=1         # 1 = desktop audio, 0 = video only
+DESU_RECORDER_QUALITY="very_high"
+DESU_RECORDER_OPTIONS=""      # advanced: extra backend arguments

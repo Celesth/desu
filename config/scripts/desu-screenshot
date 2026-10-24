@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+set -uo pipefail
+
+mode=${1:-region}
+
+case "$mode" in
+    region)
+        if command -v hyprshot >/dev/null 2>&1; then
+            exec hyprshot --freeze --clipboard-only --mode region --silent
+        fi
+        command -v grim >/dev/null 2>&1 || { printf '%s\n' 'desu screenshot: grim is not installed' >&2; exit 127; }
+        command -v slurp >/dev/null 2>&1 || { printf '%s\n' 'desu screenshot: slurp is not installed' >&2; exit 127; }
+        grim -g "$(slurp)" - | wl-copy
+        ;;
+    full)
+        command -v grim >/dev/null 2>&1 || { printf '%s\n' 'desu screenshot: grim is not installed' >&2; exit 127; }
+        grim - | wl-copy
+        ;;
+    *)
+        printf '%s\n' 'usage: desu screenshot [region|full]' >&2
+        exit 2
+        ;;
+esac

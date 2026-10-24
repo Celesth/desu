@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# DESU clipboard history frontend: cliphist + fuzzel + wl-clipboard.
+
+set -uo pipefail
+
+# shellcheck source=desu-lib.sh
+source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/desu-lib.sh"
+desu_load_settings
+desu_ensure_dirs
+
+die() { printf 'desu-clipboard: %s\n' "$*" >&2; exit 1; }
+
+show_history() {
+    desu_have cliphist || die "cliphist is not installed"
+    desu_have wl-copy || die "wl-clipboard (wl-copy) is not installed"
+    desu_have wl-paste || die "wl-clipboard (wl-paste) is not installed"
+    desu_have fuzzel || die "fuzzel is not installed"
+
+    local selection id tmp mime
+    selection=$(cliphist list 2>/dev/null | fuzzel --dmenu --prompt "clipboard > " \
+        --config "${DESU_FUZZEL_CONFIG}" 2>/dev/null) || exit 0
+    [[ -n $selection ]] || exit 0
+    id=${selection%%$'\t'*}
+
+    tmp=$(mktemp "${DESU_RUNTIME_DIR}/clipboard.XXXXXX") || die "cannot create temporary file"
+    trap 'rm -f "$tmp"' EXIT
+
+    cliphist decode "$id" >"$tmp" 2>/dev/null || die "could not decode clipboard entry $id"
+    if desu_have file; then
+        mime=$(file -b --mime-type -- "$tmp" 2>/dev/null || true)
+        case "$mime" in
+            image/*|audio/*|video/*|application/*|text/*)
+                wl-copy --type "$mime" <"$tmp"
+                ;;
+            *)
+                wl-copy <"$tmp"
+                ;;
+        esac
+    else
+        wl-copy <"$tmp"
+    fi
+    printf 'restored clipboard entry %s\n' "$id"
+}
+
+clear_history() {
+    desu_have cliphist || die "cliphist is not installed"
+    cliphist wipe
+    printf 'clipboard history cleared\n'
+}
+
+case "${1:-show}" in
+    show)   show_history ;;
+    clear)  clear_history ;;
+    watch-start) desu_clipboard_watchers_start ;;
+    watch-stop)  desu_clipboard_watchers_stop ;;
+    *)
+        cat <<EOF
+usage: desu-clipboard [show|clear|watch-start|watch-stop]
+EOF
+        exit 2
+        ;;
+esac

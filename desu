@@ -1,0 +1,461 @@
+#!/usr/bin/env bash
+# desu - CLI and lifecycle controller for the DESU desktop shell.
+
+set -uo pipefail
+
+SELF=$(readlink -f -- "${BASH_SOURCE[0]}")
+SELF_DIR=$(dirname -- "$SELF")
+if [[ -z ${DESU_CONFIG_HOME:-} && -r ${SELF}.config ]]; then
+    IFS= read -r DESU_CONFIG_HOME <"${SELF}.config"
+    export DESU_CONFIG_HOME
+fi
+: "${XDG_CONFIG_HOME:=${HOME}/.config}"
+: "${DESU_CONFIG_HOME:=${XDG_CONFIG_HOME}/desu}"
+
+LIB=""
+for candidate in \
+    "${SELF_DIR}/config/scripts/desu-lib.sh" \
+    "${DESU_CONFIG_HOME}/scripts/desu-lib.sh" \
+    "${SELF_DIR}/scripts/desu-lib.sh"; do
+    if [[ -r $candidate ]]; then
+        LIB=$candidate
+        break
+    fi
+done
+if [[ -z $LIB ]]; then
+    printf 'desu: cannot find desu-lib.sh (broken installation?)\n' >&2
+    exit 1
+fi
+# shellcheck source=config/scripts/desu-lib.sh
+source "$LIB"
+
+desu_load_settings
+desu_ensure_dirs
+
+PROG=desu
+
+die() { printf '%s: %s\n' "$PROG" "$*" >&2; exit 1; }
+warn() { printf '%s: %s\n' "$PROG" "$*" >&2; }
+say() { printf '%s\n' "$*"; }
+
+usage() {
+    cat <<EOF
+DESU ${DESU_VERSION} - monochrome Quickshell desktop for Hyprland
+
+usage: desu <command> [arguments]
+
+lifecycle
+  start                 start the shell (detached)
+  stop                  stop the shell and its clipboard watchers
+  restart               restart the shell
+  status [--json]       show shell, IPC, and recorder status
+  reload                reload the running Quickshell configuration
+  logs [-f]             show the shell log (optionally follow it)
+  version               print the project version
+  help                  show this help
+
+features
+  recorder start|stop|toggle|status|backends
+  wallpaper select|set <path>|restore|list|status|backends
+  clipboard [show|clear]
+  audio                 open pavucontrol
+  launcher              open Fuzzel
+  screenshot [region|full]  capture a screenshot to the clipboard
+  ipc <args...>         raw Quickshell IPC (debugging)
+
+diagnostics
+  doctor                check dependencies, paths, permissions, and IPC
+  config                print resolved settings
+
+Files:
+  settings   ${DESU_CONFIG_FILE}
+  runtime    ${DESU_RUNTIME_DIR}
+  log        ${DESU_SHELL_LOG}
+EOF
+}
+
+cmd_start() {
+    local qs
+    qs=$(desu_qs) || die "quickshell is not installed"
+
+    local pid
+    if pid=$(desu_shell_pid); then
+        say "desu ${DESU_VERSION}: already running (pid ${pid})"
+        return 0
+    fi
+
+    # A pidfile for a dead or recycled process is stale.
+    rm -f "$DESU_PIDFILE"
+
+    [[ -r $DESU_SHELL_QML ]] || die "shell.qml not found at ${DESU_SHELL_QML}"
+    [[ -n ${WAYLAND_DISPLAY:-} ]] || die "no Wayland session (WAYLAND_DISPLAY is unset)"
+    if ! desu_have hyprctl || ! hyprctl version >/dev/null 2>&1; then
+        warn "Hyprland is not reachable; workspace and window modules will stay empty"
+    fi
+
+    : >"$DESU_SHELL_LOG"
+    setsid "$qs" -p "$DESU_SHELL_QML" >>"$DESU_SHELL_LOG" 2>&1 </dev/null &
+    pid=$!
+    printf '%s\n' "$pid" >"$DESU_PIDFILE"
+
+    # `setsid` normally execs in place. If a platform forks, recover the real
+    # process by its exact config path rather than guessing.
+    sleep 0.2
+    if ! desu_pid_alive "$pid"; then
+        local found
+        found=$(pgrep -f -- "-p ${DESU_SHELL_QML}" 2>/dev/null | head -n 1 || true)
+        if [[ -n $found ]]; then
+            pid=$found
+            printf '%s\n' "$pid" >"$DESU_PIDFILE"
+        fi
+    fi
+
+    local i
+    for i in {1..100}; do
+        if desu_ipc ping >/dev/null 2>&1; then
+            desu_clipboard_watchers_start
+            say "desu ${DESU_VERSION}: started (pid ${pid})"
+            return 0
+        fi
+        if ! desu_pid_alive "$pid"; then
+            break
+        fi
+        sleep 0.1
+    done
+
+    warn "shell failed to start; last log lines:"
+    tail -n 20 "$DESU_SHELL_LOG" 2>/dev/null | sed 's/^/  /' >&2
+    if desu_pid_alive "$pid" && desu_pid_matches "$pid" quickshell; then
+        kill -TERM "$pid" 2>/dev/null || true
+    fi
+    rm -f "$DESU_PIDFILE"
+    return 1
+}
+
+cmd_stop() {
+    local pid
+    if ! pid=$(desu_shell_pid); then
+        if [[ -f $DESU_PIDFILE ]]; then
+            rm -f "$DESU_PIDFILE"
+            say "removed stale pidfile"
+        fi
+        desu_clipboard_watchers_stop
+        say "desu: not running"
+        return 0
+    fi
+
+    # Stop a recording started by DESU before the shell goes away. The helper
+    # validates the pid itself; this never uses a broad process match.
+    if [[ -x ${DESU_SCRIPTS_DIR}/desu-recorder ]]; then
+        local rstate
+        rstate=$("${DESU_SCRIPTS_DIR}/desu-recorder" status --field state 2>/dev/null || true)
+        if [[ $rstate == recording ]]; then
+            "${DESU_SCRIPTS_DIR}/desu-recorder" stop >/dev/null 2>&1 || true
+        fi
+    fi
+
+    desu_clipboard_watchers_stop
+
+    if ! desu_pid_matches "$pid" quickshell; then
+        warn "pidfile points at an unrelated process (pid ${pid}); refusing to signal it"
+        rm -f "$DESU_PIDFILE"
+        return 1
+    fi
+
+    kill -TERM "$pid" 2>/dev/null || true
+    local i
+    for i in {1..50}; do
+        desu_pid_alive "$pid" || break
+        sleep 0.1
+    done
+    if desu_pid_alive "$pid"; then
+        warn "shell did not exit after SIGTERM; sending SIGKILL"
+        kill -KILL "$pid" 2>/dev/null || true
+        sleep 0.1
+    fi
+    rm -f "$DESU_PIDFILE"
+    say "desu: stopped"
+}
+
+cmd_restart() {
+    cmd_stop
+    sleep 0.2
+    cmd_start
+}
+
+cmd_status() {
+    if [[ ${1:-} == --json ]]; then
+        desu_status_json
+        desu_shell_running && return 0 || return 3
+    fi
+
+    local pid
+    if pid=$(desu_shell_pid); then
+        say "desu ${DESU_VERSION}: running (pid ${pid})"
+        say "shell: ${DESU_SHELL_QML}"
+        if desu_ipc ping >/dev/null 2>&1; then
+            say "ipc:   ok"
+        else
+            say "ipc:   unreachable (shell is alive but not answering)"
+        fi
+        if [[ -x ${DESU_SCRIPTS_DIR}/desu-recorder ]]; then
+            local rstate
+            rstate=$("${DESU_SCRIPTS_DIR}/desu-recorder" status --field state 2>/dev/null || echo unknown)
+            say "recorder: ${rstate}"
+        fi
+        return 0
+    fi
+
+    if [[ -f $DESU_PIDFILE ]]; then
+        say "desu ${DESU_VERSION}: stopped (stale pidfile)"
+    else
+        say "desu ${DESU_VERSION}: stopped"
+    fi
+    return 3
+}
+
+cmd_reload() {
+    desu_require_shell || return 1
+    local out
+    if out=$(desu_ipc reload 2>&1); then
+        say "${out:-reload requested}"
+        return 0
+    fi
+    # A hard reload can close the IPC connection before the reply is read.
+    local i
+    for i in {1..30}; do
+        if desu_ipc ping >/dev/null 2>&1; then
+            say "reloaded"
+            return 0
+        fi
+        sleep 0.1
+    done
+    warn "reload failed: ${out}"
+    return 1
+}
+
+cmd_recorder() {
+    [[ -x ${DESU_SCRIPTS_DIR}/desu-recorder ]] || die "recorder helper is missing"
+    exec "${DESU_SCRIPTS_DIR}/desu-recorder" "$@"
+}
+
+cmd_wallpaper() {
+    local sub=${1:-select}
+    shift || true
+    case "$sub" in
+        select)
+            desu_require_shell || return 1
+            local out
+            if ! out=$(desu_ipc wallpaperOpen 2>&1); then
+                warn "could not open wallpaper selector: ${out}"
+                return 1
+            fi
+            say "wallpaper selector opened"
+            ;;
+        set|restore|list|status|backends)
+            [[ -x ${DESU_SCRIPTS_DIR}/desu-wallpaper ]] || die "wallpaper helper is missing"
+            exec "${DESU_SCRIPTS_DIR}/desu-wallpaper" "$sub" "$@"
+            ;;
+        *)
+            die "usage: desu wallpaper <select|set <path>|restore|list|status|backends>"
+            ;;
+    esac
+}
+
+cmd_clipboard() {
+    [[ -x ${DESU_SCRIPTS_DIR}/desu-clipboard ]] || die "clipboard helper is missing"
+    exec "${DESU_SCRIPTS_DIR}/desu-clipboard" "${1:-show}"
+}
+
+cmd_audio() {
+    [[ -x ${DESU_SCRIPTS_DIR}/desu-audio ]] || die "audio helper is missing"
+    exec "${DESU_SCRIPTS_DIR}/desu-audio"
+}
+
+cmd_launcher() {
+    [[ -x ${DESU_SCRIPTS_DIR}/desu-launcher ]] || die "launcher helper is missing"
+    exec "${DESU_SCRIPTS_DIR}/desu-launcher" "$@"
+}
+
+cmd_screenshot() {
+    [[ -x ${DESU_SCRIPTS_DIR}/desu-screenshot ]] || die "screenshot helper is missing"
+    exec "${DESU_SCRIPTS_DIR}/desu-screenshot" "${1:-region}"
+}
+
+cmd_logs() {
+    [[ -r $DESU_SHELL_LOG ]] || die "no shell log yet (${DESU_SHELL_LOG})"
+    if [[ ${1:-} == -f || ${1:-} == --follow ]]; then
+        tail -n 50 -f "$DESU_SHELL_LOG"
+    else
+        tail -n 100 "$DESU_SHELL_LOG"
+    fi
+}
+
+cmd_ipc() {
+    desu_require_shell || return 1
+    local pid
+    pid=$(desu_shell_pid) || return 1
+    exec "$(desu_qs)" ipc --pid "$pid" "$@"
+}
+
+cmd_config() {
+    say "DESU_VERSION=${DESU_VERSION}"
+    say "DESU_CONFIG_FILE=${DESU_CONFIG_FILE}"
+    say "DESU_SHELL_QML=${DESU_SHELL_QML}"
+    say "DESU_SCRIPTS_DIR=${DESU_SCRIPTS_DIR}"
+    say "DESU_RUNTIME_DIR=${DESU_RUNTIME_DIR}"
+    say "DESU_BAR_EDGE=${DESU_BAR_EDGE}"
+    say "DESU_BAR_HEIGHT=${DESU_BAR_HEIGHT}"
+    say "DESU_BAR_MARGIN=${DESU_BAR_MARGIN}"
+    say "DESU_FONT=${DESU_FONT}"
+    say "DESU_FONT_SIZE=${DESU_FONT_SIZE}"
+    say "DESU_TIME_FORMAT=${DESU_TIME_FORMAT}"
+    say "DESU_DATE_FORMAT=${DESU_DATE_FORMAT}"
+    say "DESU_WALLPAPER_DIR=${DESU_WALLPAPER_DIR}"
+    say "DESU_WALLPAPER_BACKEND=${DESU_WALLPAPER_BACKEND}"
+    say "DESU_RECORDER_BACKEND=${DESU_RECORDER_BACKEND}"
+    say "DESU_RECORDER_OUTPUT_DIR=${DESU_RECORDER_OUTPUT_DIR}"
+    say "DESU_RECORDER_FPS=${DESU_RECORDER_FPS}"
+    say "DESU_RECORDER_AUDIO=${DESU_RECORDER_AUDIO}"
+}
+
+cmd_doctor() {
+    local failed=0 warned=0
+    ok()   { printf '[ok]   %s\n' "$*"; }
+    opt()  { printf '[warn] %s\n' "$*"; warned=$((warned + 1)); }
+    bad()  { printf '[fail] %s\n' "$*"; failed=$((failed + 1)); }
+    neutral() { printf '       %s\n' "$*"; }
+
+    printf 'DESU %s doctor\n\n' "$DESU_VERSION"
+
+    # Required runtime pieces.
+    local qs_path
+    if qs_path=$(desu_qs); then
+        ok "quickshell: ${qs_path}"
+        neutral "$("$qs_path" --version 2>&1 | head -n 1)"
+    else
+        bad "quickshell is not installed"
+    fi
+    if desu_have hyprctl; then
+        if hyprctl version >/dev/null 2>&1; then
+            ok "Hyprland: $(hyprctl version 2>/dev/null | head -n 1)"
+        else
+            bad "hyprctl exists but no Hyprland instance is reachable"
+        fi
+    else
+        bad "hyprctl is not installed (Hyprland missing?)"
+    fi
+    if desu_have fuzzel; then
+        ok "fuzzel: $(fuzzel --version 2>&1 | head -n 1)"
+    else
+        bad "fuzzel is not installed (launcher and clipboard UI)"
+    fi
+
+    # Configuration and permissions.
+    [[ -r $DESU_SHELL_QML ]] && ok "shell config: ${DESU_SHELL_QML}" || bad "shell config missing: ${DESU_SHELL_QML}"
+    [[ -r $DESU_CONFIG_FILE ]] && ok "settings: ${DESU_CONFIG_FILE}" || opt "settings not found (defaults will be used)"
+    [[ -d $DESU_RUNTIME_DIR ]] && ok "runtime dir: ${DESU_RUNTIME_DIR}" || bad "runtime dir missing: ${DESU_RUNTIME_DIR}"
+    if [[ -d $DESU_RUNTIME_DIR ]]; then
+        local mode
+        mode=$(stat -c '%a' "$DESU_RUNTIME_DIR" 2>/dev/null || echo '?')
+        [[ $mode == 700 ]] && ok "runtime permissions: 700" || opt "runtime permissions are ${mode} (expected 700)"
+    fi
+    [[ -d $DESU_STATE_HOME ]] && ok "state dir: ${DESU_STATE_HOME}" || opt "state dir missing: ${DESU_STATE_HOME}"
+    [[ -r $DESU_FUZZEL_CONFIG ]] && ok "fuzzel config: ${DESU_FUZZEL_CONFIG}" || opt "fuzzel config missing: ${DESU_FUZZEL_CONFIG}"
+
+    # Shell / IPC.
+    local pid
+    if pid=$(desu_shell_pid); then
+        ok "shell process: pid ${pid}"
+        if desu_ipc ping >/dev/null 2>&1; then
+            ok "IPC: ping/pong with correct instance"
+        else
+            bad "IPC unreachable for pid ${pid}"
+        fi
+    else
+        opt "shell is not running (desu start)"
+    fi
+
+    # Audio.
+    if desu_have wpctl || desu_have pactl; then
+        ok "audio tools: $(desu_have wpctl && echo wpctl || echo pactl)"
+        if desu_have wpctl && wpctl status >/dev/null 2>&1; then
+            neutral "PipeWire/WirePlumber reachable"
+        else
+            opt "audio server not reachable (PipeWire/WirePlumber)"
+        fi
+    else
+        bad "no wpctl or pactl (audio volume will not work)"
+    fi
+    desu_have pavucontrol && ok "pavucontrol: installed" || opt "pavucontrol not installed (full mixer unavailable)"
+
+    # Clipboard.
+    if desu_have cliphist; then ok "cliphist: installed"; else opt "cliphist not installed (clipboard history unavailable)"; fi
+    if desu_have wl-copy && desu_have wl-paste; then ok "wl-clipboard: installed"; else opt "wl-clipboard not installed"; fi
+
+    # Recorder.
+    local backend
+    if [[ -x ${DESU_SCRIPTS_DIR}/desu-recorder ]]; then
+        while IFS= read -r line; do neutral "$line"; done < <("${DESU_SCRIPTS_DIR}/desu-recorder" backends 2>/dev/null || true)
+        backend=$("${DESU_SCRIPTS_DIR}/desu-recorder" backends 2>/dev/null | sed -n 's/^selected: //p')
+        if [[ -n $backend && $backend != none ]]; then ok "recording backend: ${backend}"; else opt "no usable recording backend"; fi
+    else
+        bad "recorder helper missing"
+    fi
+
+    # Wallpaper.
+    if [[ -x ${DESU_SCRIPTS_DIR}/desu-wallpaper ]]; then
+        local wp
+        wp=$("${DESU_SCRIPTS_DIR}/desu-wallpaper" backends 2>/dev/null | sed -n 's/^available: //p')
+        if [[ -n $wp && $wp != none ]]; then ok "wallpaper backend: ${wp}"; else opt "no wallpaper backend (install awww or swww)"; fi
+    else
+        bad "wallpaper helper missing"
+    fi
+    [[ -d $DESU_WALLPAPER_DIR ]] && ok "wallpaper dir: ${DESU_WALLPAPER_DIR}" || opt "wallpaper dir missing: ${DESU_WALLPAPER_DIR}"
+    if desu_have magick || desu_have convert; then
+        ok "ImageMagick available for thumbnails"
+    else
+        opt "ImageMagick not installed (slower thumbnail fallback)"
+    fi
+
+    # Fonts.
+    if desu_have fc-list && fc-list 2>/dev/null | grep -qiF "$DESU_FONT"; then
+        ok "font: ${DESU_FONT}"
+    else
+        opt "font '${DESU_FONT}' not found (Qt will use a fallback)"
+    fi
+
+    printf '\n'
+    if (( failed > 0 )); then
+        printf 'doctor: %d failure(s), %d warning(s)\n' "$failed" "$warned"
+        return 1
+    fi
+    printf 'doctor: ok (%d warning(s))\n' "$warned"
+}
+
+main() {
+    local cmd=${1:-help}
+    shift || true
+    case "$cmd" in
+        start)     cmd_start ;;
+        stop)      cmd_stop ;;
+        restart)   cmd_restart ;;
+        status)    cmd_status "$@" ;;
+        reload)    cmd_reload ;;
+        version|--version|-V) say "$DESU_VERSION" ;;
+        logs)      cmd_logs "${1:-}" ;;
+        recorder)  cmd_recorder "$@" ;;
+        wallpaper) cmd_wallpaper "$@" ;;
+        clipboard) cmd_clipboard "$@" ;;
+        audio)     cmd_audio ;;
+        launcher)  cmd_launcher "$@" ;;
+        screenshot) cmd_screenshot "$@" ;;
+        ipc)       cmd_ipc "$@" ;;
+        doctor)    cmd_doctor ;;
+        config)    cmd_config ;;
+        help|--help|-h) usage ;;
+        *) warn "unknown command: ${cmd}"; usage >&2; exit 2 ;;
+    esac
+}
+
+main "$@"

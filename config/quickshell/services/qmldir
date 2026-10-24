@@ -1,0 +1,9 @@
+module services
+
+singleton Theme Theme.qml
+singleton Settings Settings.qml
+singleton Desktop Desktop.qml
+singleton AudioService AudioService.qml
+singleton Recorder Recorder.qml
+singleton Wallpapers Wallpapers.qml
+singleton Notifications Notifications.qml
