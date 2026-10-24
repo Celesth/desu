@@ -1,77 +1,131 @@
 # DESU
 
-DESU is a small, monochrome desktop shell for Arch Linux, built with
-[Quickshell](https://quickshell.outfoxxed.me/) and Hyprland. It keeps the bar
-rectangular and event-driven, with optional helpers for audio, recording,
-clipboard history, launchers, and wallpapers.
+DESU is a small monochrome desktop shell for Arch Linux, built around
+[Quickshell](https://quickshell.outfoxxed.me/) and Hyprland. It provides a
+rectangular status bar, an app launcher, notifications, MPRIS controls,
+clipboard history, wallpaper selection, audio controls, and screen recording.
 
-The current release is `0.2.0`. DESU favors low startup cost and a small
-dependency surface: Quickshell, Hyprland, Fuzzel, `wl-clipboard`, and
-`cliphist` are the core pieces. `gpu-screen-recorder`, `wf-recorder`, `awww`,
-`swww`, ImageMagick, and `pavucontrol` are optional.
+![DESU on an empty Hyprland workspace](docs/screenshots/desu-empty-workspace.png)
+
+## Features
+
+- Lightweight Quickshell bar with workspaces, active window, system tray,
+  audio, MPRIS, notifications, and clock controls.
+- Mouse-interactable Fuzzel launcher with apps as the default view.
+- Clipboard history through `cliphist` and `wl-clipboard`.
+- Wallpaper management through `awww` with a clickable selector and restore
+  support.
+- Screen recording with `gpu-screen-recorder` or `wf-recorder` fallback.
+- Modular Lua Hyprland configuration with `SUPER` as the main modifier.
+- Matching Kitty, btop, Starship, and Fastfetch configuration.
+
+## Requirements
+
+Required:
+
+- Arch Linux or another Linux distribution with Wayland
+- Hyprland 0.55 or newer
+- Quickshell
+- `fuzzel`, `wl-clipboard`, and `cliphist`
+- `awww` and `awww-daemon`
+- `kitty` and `starship`
+
+Optional integrations are detected automatically: `pavucontrol`,
+`gpu-screen-recorder`, `wf-recorder`, ImageMagick, `playerctl`, and
+`network-manager-applet`.
 
 ## Install
 
-Clone the repository anywhere and run:
-
 ```sh
-./install.sh
+git clone https://github.com/Celesth/desu.git
+cd desu
+./install.sh --hyprland
 desu doctor
 ```
 
-The installer copies the payload to `~/.config/desu` and the CLI to
-`~/.local/bin/desu`. Existing targets are moved to timestamped backups before
-they are changed. Use `--bin-dir` or `--config-dir` for another XDG-compatible
-location. Add `--hyprland` to back up and replace the Lua main config at
-`~/.config/hypr/hyprland.lua`.
+The installer copies the shell payload to `~/.config/desu` and the command to
+`~/.local/bin/desu`. Existing files are moved to timestamped backups before
+they are changed. Add `--bin-dir DIR` or `--config-dir DIR` to customize the
+installation locations.
 
-DESU includes a self-contained Lua Hyprland config with `SUPER` as the main
-modifier. `SUPER` release opens the mouse-interactable app list in Fuzzel.
-`SUPER+Shift+D` opens DESU actions; clipboard, wallpaper, recorder, audio, and
-notifications are also available directly on `SUPER+C/W/R/A/N`. `SUPER+Return`
-opens the terminal, `SUPER+Shift+S` takes a screenshot, and `SUPER` plus mouse
-wheel changes workspace. `--hyprland` backs up the current Lua main config
-before installing this one. `desu start` also works manually; it refuses to
-start outside a Wayland session.
+The `--hyprland` option installs the Lua entrypoint at
+`~/.config/hypr/hyprland.lua` and its modules at `~/.config/hypr/desu/`.
+Reload Hyprland after installation if it does not reload automatically:
+
+```sh
+hyprctl reload
+```
+
+## Keybindings
+
+| Binding | Action |
+| --- | --- |
+| `SUPER` release | Open the app launcher |
+| `SUPER + Return` | Open terminal |
+| `SUPER + V` | Open clipboard history |
+| `SUPER + W` or `SUPER + Ctrl + T` | Open wallpaper selector |
+| `SUPER + Shift + D` | Open DESU actions |
+| `SUPER + Shift + S` | Screenshot region |
+| `SUPER + N` | Toggle notifications |
+| `SUPER + A` | Open audio mixer |
+| `SUPER + R` | Toggle screen recording |
+| `SUPER + Shift + K` | Terminate the focused window |
+| `SUPER + mouse wheel` | Change workspace |
+| `SUPER + Alt + mouse wheel` | Move the focused window between workspaces |
+| `SUPER + left mouse` | Drag a window |
+| `SUPER + 1–0` or keypad numbers | Switch workspace |
+| `SUPER + Shift + 1–0` or keypad numbers | Move window to workspace |
 
 ## Commands
 
 ```text
 desu start|stop|restart|status|reload|logs
-desu recorder start|stop|toggle|status|backends
-desu wallpaper select|set|restore|list|status|backends
+desu launcher [actions]
 desu clipboard [show|clear]
-desu audio                 # opens pavucontrol
-desu launcher              # opens the app list in Fuzzel
-desu launcher actions      # opens DESU actions in Fuzzel
+desu wallpaper select|set|restore|list|status|backends
+desu recorder start|stop|toggle|status|backends
+desu audio
+desu screenshot [region|full]
 desu doctor|config|version
 ```
 
-The CLI talks to the running shell through Quickshell IPC, selected by its
-exact process ID. Runtime files are kept under `$XDG_RUNTIME_DIR/desu` with
-mode `700`; shell logs and persistent selections use XDG state/cache paths.
+Run `desu doctor` to inspect dependencies, paths, permissions, and Quickshell
+IPC state.
 
 ## Configuration
 
-Edit `~/.config/desu/config`, or set `DESU_*` variables for one invocation.
-The repository copy is at `config/desu/config`. Important options include:
+Edit the installed settings at `~/.config/desu/config`. The repository
+template is `config/desu/config`. Useful options include:
 
 - `DESU_BAR_EDGE`, `DESU_BAR_HEIGHT`, and `DESU_FONT`
 - `DESU_WALLPAPER_DIR` and `DESU_WALLPAPER_BACKEND`
 - `DESU_RECORDER_BACKEND`, `DESU_RECORDER_OUTPUT_DIR`, and `DESU_RECORDER_FPS`
 
-The palette is centralized in `config/quickshell/services/Theme.qml`.
+The Hyprland configuration is intentionally split into focused modules:
 
-## Clipboard and recording
+```text
+config/hyprland/hyprland.lua       entrypoint and module loader
+config/hyprland/desu/core.lua      general settings, environment, monitor
+config/hyprland/desu/lifecycle.lua startup and wallpaper restoration
+config/hyprland/desu/bindings.lua  keyboard and mouse bindings
+config/hyprland/desu/rules.lua     window rules
+```
 
-DESU starts one text and one image `wl-paste --watch cliphist store` watcher
-when the shell starts. `desu clipboard` presents `cliphist list` in Fuzzel and
-restores the selected entry with `cliphist decode`, preserving detected MIME
-types where possible. `desu clipboard clear` uses `cliphist wipe`.
+## Development
 
-Recording prefers `gpu-screen-recorder` and falls back to `wf-recorder`.
-Backend selection, output paths, and failures are exposed by
-`desu recorder status` and `desu doctor`.
+Run the shell directly from the repository with:
+
+```sh
+DESU_CONFIG_HOME="$PWD/config" ./desu start
+```
+
+Run the smoke tests with:
+
+```sh
+tests/test-cli.sh
+```
+
+See `docs/CHANGELOG.md` for release notes.
 
 ## Uninstall
 
@@ -79,13 +133,5 @@ Backend selection, output paths, and failures are exposed by
 ./uninstall.sh
 ```
 
-The installed command and payload are moved to recoverable backups. State and
-cache remain untouched. `./uninstall.sh --purge` removes only DESU state and
-cache after an explicit request.
-
-## Development
-
-The repo can be run in place with `DESU_CONFIG_HOME=/path/to/config-home ./desu
-start`, or directly with `quickshell -p config/quickshell`. Run
-`tests/test-cli.sh` for the dependency-free smoke checks. See
-`docs/CHANGELOG.md` for release notes.
+Uninstall moves the installed command and payload to recoverable backups.
+Runtime state and cache remain untouched unless `--purge` is explicitly used.

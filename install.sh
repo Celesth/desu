@@ -233,10 +233,15 @@ printf '%s\n' "$ROOT" >"${CONFIG_TARGET}/.source"
 
 if (( INSTALL_HYPRLAND )); then
     HYPRLAND_TARGET="${XDG_CONFIG_HOME}/hypr/hyprland.lua"
+    HYPRLAND_MODULE_TARGET="${XDG_CONFIG_HOME}/hypr/desu"
+    backup_path "$HYPRLAND_MODULE_TARGET"
+    mkdir -p "$HYPRLAND_MODULE_TARGET"
+    cp -a -- "${PAYLOAD_SOURCE}/hyprland/desu/." "$HYPRLAND_MODULE_TARGET/"
     backup_path "$HYPRLAND_TARGET"
     mkdir -p "$(dirname -- "$HYPRLAND_TARGET")"
     install -m 644 "${PAYLOAD_SOURCE}/hyprland/hyprland.lua" "$HYPRLAND_TARGET"
     printf 'hyprland: %s\n' "$HYPRLAND_TARGET"
+    printf 'hyprland modules: %s\n' "$HYPRLAND_MODULE_TARGET"
 fi
 
 printf 'installed DESU %s\n' "$(head -n 1 "${ROOT}/VERSION")"
