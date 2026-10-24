@@ -65,6 +65,7 @@ backup_path() {
     [[ -e $path || -L $path ]] || return 0
     backup="${path}.backup-${STAMP}"
     mv -- "$path" "$backup"
+    BACKUP_PATH=$backup
     printf 'backup: %s -> %s\n' "$path" "$backup"
 }
 
@@ -82,6 +83,145 @@ install -m 644 "${PAYLOAD_SOURCE}/desu/config" "$CONFIG_TARGET/config"
 install -m 644 "${ROOT}/VERSION" "${CONFIG_TARGET}/VERSION"
 chmod 700 "$CONFIG_TARGET/scripts" 2>/dev/null || true
 find "$CONFIG_TARGET/scripts" -type f -exec chmod 755 {} +
+
+install_desu_themes() {
+    local kitty_dir="${XDG_CONFIG_HOME}/kitty"
+    local kitty_conf="${kitty_dir}/kitty.conf"
+    local btop_dir="${XDG_CONFIG_HOME}/btop"
+    local btop_conf="${btop_dir}/btop.conf"
+    local btop_theme="${btop_dir}/themes/desu.theme"
+
+    if [[ -f ${PAYLOAD_SOURCE}/kitty/desu-colors.conf ]]; then
+        mkdir -p "$kitty_dir"
+        install -m 644 "${PAYLOAD_SOURCE}/kitty/desu-colors.conf" \
+            "${kitty_dir}/desu-colors.conf"
+        if [[ -f $kitty_conf ]] && ! grep -Fqx 'include desu-colors.conf' "$kitty_conf"; then
+            backup_path "$kitty_conf"
+            cat "$BACKUP_PATH" >"$kitty_conf"
+            printf '\ninclude desu-colors.conf\n' >>"$kitty_conf"
+        elif [[ ! -f $kitty_conf ]]; then
+            printf 'include desu-colors.conf\n' >"$kitty_conf"
+        fi
+    fi
+
+    if [[ -f ${PAYLOAD_SOURCE}/btop/themes/desu.theme ]]; then
+        mkdir -p "${btop_dir}/themes"
+        install -m 644 "${PAYLOAD_SOURCE}/btop/themes/desu.theme" "$btop_theme"
+        if [[ -f $btop_conf ]] && ! grep -Fq "color_theme = \"$btop_theme\"" "$btop_conf"; then
+            backup_path "$btop_conf"
+            awk -v theme="$btop_theme" '
+                /^color_theme[[:space:]]*=/ {
+                    print "color_theme = \"" theme "\""
+                    replaced = 1
+                    next
+                }
+                { print }
+                END {
+                    if (!replaced) print "color_theme = \"" theme "\""
+                }
+            ' "$BACKUP_PATH" >"$btop_conf"
+        elif [[ ! -f $btop_conf ]]; then
+            printf 'color_theme = "%s"\n' "$btop_theme" >"$btop_conf"
+        fi
+    fi
+}
+
+install_desu_themes
+
+install_starship() {
+    local starship_target="${XDG_CONFIG_HOME}/starship.toml"
+    local fish_dir="${XDG_CONFIG_HOME}/fish"
+    local fish_config="${fish_dir}/config.fish"
+
+    if [[ -f ${PAYLOAD_SOURCE}/starship.toml ]]; then
+        mkdir -p "$(dirname -- "$starship_target")"
+        if [[ -f $starship_target ]] && ! cmp -s "${PAYLOAD_SOURCE}/starship.toml" "$starship_target"; then
+            backup_path "$starship_target"
+        fi
+        install -m 644 "${PAYLOAD_SOURCE}/starship.toml" "$starship_target"
+    fi
+
+    if command -v starship >/dev/null 2>&1; then
+        mkdir -p "$fish_dir"
+        if [[ -f $fish_config ]] && ! grep -Fq 'starship init fish | source' "$fish_config"; then
+            backup_path "$fish_config"
+            cat "$BACKUP_PATH" >"$fish_config"
+            printf '\nstarship init fish | source\n' >>"$fish_config"
+        elif [[ ! -f $fish_config ]]; then
+            printf 'starship init fish | source\n' >"$fish_config"
+        fi
+    fi
+}
+
+install_starship
+
+install_fastfetch() {
+    local fastfetch_dir="${XDG_CONFIG_HOME}/fastfetch"
+    local fastfetch_config="${fastfetch_dir}/config.jsonc"
+    local fish_dir="${XDG_CONFIG_HOME}/fish"
+    local fish_config="${fish_dir}/config.fish"
+
+    if [[ -f ${PAYLOAD_SOURCE}/fastfetch/config.jsonc ]]; then
+        mkdir -p "$fastfetch_dir"
+        install -m 644 "${PAYLOAD_SOURCE}/fastfetch/config.jsonc" "$fastfetch_config"
+        if [[ -f ${fastfetch_dir}/desu.jsonc ]]; then
+            backup_path "${fastfetch_dir}/desu.jsonc"
+        fi
+    fi
+
+    if ! command -v fish >/dev/null 2>&1; then
+        return 0
+    fi
+
+    mkdir -p "$fish_dir"
+    if [[ -f $fish_config ]]; then
+        if grep -Fq 'function fish_greeting' "$fish_config" || \
+                ! grep -Fq '# DESU Fastfetch' "$fish_config" || \
+                ! grep -Fq 'fastfetch --config "$HOME/.config/fastfetch/config.jsonc"' "$fish_config"; then
+            backup_path "$fish_config"
+            awk '
+                /^function fish_greeting([[:space:]]|$)/ {
+                    skipping = 1
+                    depth = 1
+                    next
+                }
+                /^# DESU Fastfetch$/ {
+                    skipping_fastfetch = 1
+                    next
+                }
+                skipping_fastfetch {
+                    if ($0 ~ /^end([[:space:]]|$)/) skipping_fastfetch = 0
+                    next
+                }
+                skipping {
+                    if ($0 ~ /^(if|for|while|function)[[:space:]]/) depth++
+                    if ($0 ~ /^end([[:space:]]|$)/) {
+                        depth--
+                        if (depth == 0) skipping = 0
+                    }
+                    next
+                }
+                { print }
+            ' "$BACKUP_PATH" >"$fish_config"
+            cat >>"$fish_config" <<'EOF'
+
+# DESU Fastfetch
+function ffetch
+    fastfetch --config "$HOME/.config/fastfetch/config.jsonc" $argv
+end
+EOF
+        fi
+    else
+        cat >"$fish_config" <<'EOF'
+# DESU Fastfetch
+function ffetch
+    fastfetch --config "$HOME/.config/fastfetch/config.jsonc" $argv
+end
+EOF
+    fi
+}
+
+install_fastfetch
 
 backup_path "$COMMAND_TARGET"
 install -m 755 "${ROOT}/desu" "$COMMAND_TARGET"

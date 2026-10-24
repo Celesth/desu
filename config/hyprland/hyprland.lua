@@ -58,8 +58,9 @@ hl.bind(MAIN .. " + RETURN", command(TERMINAL), { description = "Open terminal" 
 hl.bind(MAIN .. " + SHIFT + D", command("desu launcher actions"), {
 	description = "Open DESU actions",
 })
-hl.bind(MAIN .. " + C", command("desu clipboard"), { description = "Open clipboard history" })
+hl.bind(MAIN .. " + V", command("desu clipboard"), { description = "Open clipboard history" })
 hl.bind(MAIN .. " + W", command("desu wallpaper select"), { description = "Open wallpaper selector" })
+hl.bind(MAIN .. " + CTRL + T", command("desu wallpaper select"), { description = "Open wallpaper selector" })
 hl.bind(MAIN .. " + R", command("desu recorder toggle"), { description = "Toggle screen recorder" })
 hl.bind(MAIN .. " + A", command("desu audio"), { description = "Open audio mixer" })
 hl.bind(MAIN .. " + N", command("desu ipc call desu notificationToggle"), {
@@ -69,6 +70,7 @@ hl.bind(MAIN .. " + SHIFT + S", command("desu screenshot region"), {
 	description = "Take a screenshot",
 })
 hl.bind(MAIN .. " + Q", hl.dsp.window.close(), { description = "Close window" })
+hl.bind(MAIN .. " + SHIFT + K", hl.dsp.window.close(), { description = "Terminate focused window" })
 hl.bind(MAIN .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" }), {
 	description = "Toggle fullscreen",
 })
@@ -93,11 +95,15 @@ hl.bind(MAIN .. " + SHIFT + Down", hl.dsp.window.move({ direction = "d" }), {
 	description = "Move window down",
 })
 
-hl.bind(MAIN .. " + mouse_down", hl.dsp.focus({ workspace = "r-1" }), {
+hl.bind(MAIN .. " + mouse_up", hl.dsp.focus({ workspace = "r-1" }), {
 	description = "Previous workspace",
 })
-hl.bind(MAIN .. " + mouse_up", hl.dsp.focus({ workspace = "r+1" }), {
+hl.bind(MAIN .. " + mouse_down", hl.dsp.focus({ workspace = "r+1" }), {
 	description = "Next workspace",
+})
+hl.bind(MAIN .. " + mouse:272", hl.dsp.window.drag(), {
+	mouse = true,
+	description = "Move window with mouse",
 })
 
 for index = 1, 10 do
@@ -107,6 +113,12 @@ for index = 1, 10 do
 	})
 	hl.bind(MAIN .. " + SHIFT + " .. key, command("hyprctl dispatch movetoworkspacesilent " .. index), {
 		description = "Move window to workspace " .. index,
+	})
+	hl.bind(MAIN .. " + KP_" .. key, command("hyprctl dispatch workspace " .. index), {
+		description = "Switch to workspace " .. index .. " with keypad",
+	})
+	hl.bind(MAIN .. " + SHIFT + KP_" .. key, command("hyprctl dispatch movetoworkspacesilent " .. index), {
+		description = "Move window to workspace " .. index .. " with keypad",
 	})
 end
 

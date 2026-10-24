@@ -1,0 +1,46 @@
+# DESU minimal Nvim-style prompt.
+add_newline = true
+command_timeout = 500
+format = "$username$hostname$directory$git_branch$git_status$line_break$character"
+
+[username]
+show_always = true
+style_user = "bold #E6E6E6"
+format = "[$user]($style)"
+
+[directory]
+style = "bold #E6E6E6"
+format = "[$path]($style) "
+truncation_length = 3
+truncate_to_repo = true
+home_symbol = "~"
+
+[hostname]
+ssh_only = false
+trim_at = "."
+style = "#858585"
+format = "[@$hostname]($style) "
+
+[git_branch]
+symbol = " "
+style = "#B8B8B8"
+format = "[$symbol$branch]($style) "
+
+[git_status]
+style = "#858585"
+format = "([$all_status$ahead_behind]($style))"
+conflicted = "=${count}"
+ahead = "⇡${count}"
+behind = "⇣${count}"
+diverged = "⇕⇡${ahead_count}⇣${behind_count}"
+up_to_date = ""
+untracked = "?${count}"
+stashed = '$${count}'
+modified = "!${count}"
+staged = "+${count}"
+renamed = "»${count}"
+deleted = "✘${count}"
+
+[character]
+success_symbol = "[❯](bold #E6E6E6) "
+error_symbol = "[❯](bold #858585) "

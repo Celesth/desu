@@ -1,23 +1,38 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Wayland
 import Quickshell.Widgets
-import "../components"
 import "../services"
 
-Item {
+PanelWindow {
     id: root
 
     visible: Notifications.open
-    implicitHeight: visible ? 300 : 0
-    clip: true
+    implicitWidth: 420
+    implicitHeight: 300
+    exclusiveZone: 0
+    exclusionMode: ExclusionMode.Ignore
+    aboveWindows: true
+    focusable: false
+
+    anchors {
+        top: Settings.barEdge !== "bottom"
+        bottom: Settings.barEdge === "bottom"
+        right: true
+    }
+    margins {
+        top: Settings.barEdge === "top" ? Settings.barMargin + Settings.barHeight : 0
+        bottom: Settings.barEdge === "bottom" ? Settings.barMargin + Settings.barHeight : 0
+        right: 8
+    }
+
+    WlrLayershell.namespace: "desu-notifications"
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
     Rectangle {
-        anchors.top: parent.top
-        anchors.right: parent.right
-        anchors.rightMargin: 8
-        width: Math.min(400, parent.width - 16)
-        height: parent.height - 8
+        anchors.fill: parent
         color: Theme.surface
         border.width: Theme.borderWidth
         border.color: Theme.border

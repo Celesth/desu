@@ -12,10 +12,10 @@ PanelWindow {
     readonly property string screenName: bar.screen ? bar.screen.name : ""
 
     color: Theme.background
-    implicitHeight: Settings.barHeight + (Notifications.open ? 300 : 0)
-    exclusiveZone: implicitHeight + Settings.barMargin
+    implicitHeight: Settings.barHeight
+    exclusiveZone: Settings.barHeight + Settings.barMargin
     aboveWindows: true
-    focusable: false
+    focusable: true
 
     anchors {
         top: Settings.barEdge !== "bottom"
@@ -77,6 +77,8 @@ PanelWindow {
 
                 Tray {}
 
+                MprisButton {}
+
                 AudioButton {}
 
                 BarButton {
@@ -90,9 +92,5 @@ PanelWindow {
             }
         }
 
-        NotificationPanel {
-            width: parent.width
-            height: Notifications.open ? 300 : 0
-        }
     }
 }

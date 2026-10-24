@@ -17,6 +17,17 @@ ShellRoot {
         }
     }
 
+    Variants {
+        model: Quickshell.screens
+
+        delegate: Component {
+            NotificationPanel {
+                required property var modelData
+                screen: modelData
+            }
+        }
+    }
+
     WallpaperSelector {}
 
     // This is the control surface used by the `desu` CLI through

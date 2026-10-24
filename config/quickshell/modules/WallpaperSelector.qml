@@ -9,6 +9,28 @@ import "../services"
 PanelWindow {
     id: root
 
+    property string searchText: ""
+    property var filteredItems: []
+
+    onSearchTextChanged: root.updateFilteredItems()
+
+    function updateFilteredItems() {
+        const query = root.searchText.trim().toLowerCase();
+        if (!query) {
+            root.filteredItems = Wallpapers.items;
+            return;
+        }
+
+        const matches = [];
+        for (let i = 0; i < Wallpapers.items.length; i++) {
+            const item = Wallpapers.items[i];
+            const name = (item.name || "").toLowerCase();
+            const path = (item.path || "").toLowerCase();
+            if (name.indexOf(query) !== -1 || path.indexOf(query) !== -1) matches.push(item);
+        }
+        root.filteredItems = matches;
+    }
+
     visible: Wallpapers.open
     screen: Desktop.focusedScreen
     color: "#202020CC"
@@ -35,8 +57,21 @@ PanelWindow {
     WlrLayershell.keyboardFocus: Wallpapers.open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     onVisibleChanged: {
-        if (visible) content.forceActiveFocus();
+        if (visible) {
+            root.searchText = "";
+            searchInput.clear();
+            searchInput.forceActiveFocus();
+        }
     }
+
+    Connections {
+        target: Wallpapers
+        function onItemsChanged() {
+            root.updateFilteredItems();
+        }
+    }
+
+    Component.onCompleted: root.updateFilteredItems()
 
     Shortcut {
         sequence: "Escape"
@@ -52,6 +87,19 @@ PanelWindow {
         focus: true
 
         Keys.onEscapePressed: Wallpapers.hide()
+
+        TextInput {
+            id: searchInput
+            x: 0
+            y: 0
+            width: 1
+            height: 1
+            opacity: 0
+            activeFocusOnPress: false
+            text: root.searchText
+            onTextChanged: root.searchText = text
+            Keys.onEscapePressed: Wallpapers.hide()
+        }
 
         Rectangle {
             anchors.fill: parent
@@ -119,7 +167,7 @@ PanelWindow {
             cellHeight: 126
             cacheBuffer: 0
             boundsBehavior: Flickable.StopAtBounds
-            model: Wallpapers.items
+            model: root.filteredItems
 
             delegate: Item {
                 id: cell
@@ -133,7 +181,7 @@ PanelWindow {
                     anchors.fill: parent
                     anchors.margins: 4
                     color: cell.selected ? Theme.elevated : Theme.surface
-                    border.width: (cell.selected || hover.containsMouse) ? Theme.borderWidth : 0
+                    border.width: (cell.selected || hover.hovered) ? Theme.borderWidth : 0
                     border.color: Theme.border
                     radius: 0
 
@@ -172,12 +220,14 @@ PanelWindow {
                         }
                     }
 
-                    MouseArea {
+                    HoverHandler {
                         id: hover
-                        anchors.fill: parent
-                        hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: Wallpapers.apply(cell.modelData.path)
+                    }
+
+                    TapHandler {
+                        acceptedButtons: Qt.LeftButton
+                        onTapped: Wallpapers.apply(cell.modelData.path)
                     }
                 }
             }
@@ -194,10 +244,12 @@ PanelWindow {
 
         Text {
             anchors.centerIn: parent
-            visible: !Wallpapers.loading && Wallpapers.items.length === 0
+            visible: !Wallpapers.loading && root.filteredItems.length === 0
             text: Wallpapers.error.length > 0
                 ? Wallpapers.error
-                : "NO WALLPAPERS IN " + Settings.wallpaperDir
+                : root.searchText.length > 0
+                    ? "NO MATCHING WALLPAPERS"
+                    : "NO WALLPAPERS IN " + Settings.wallpaperDir
             color: Wallpapers.error.length > 0 ? Theme.text : Theme.textMuted
             font.family: Settings.fontFamily
             font.pixelSize: Settings.fontSize + 1

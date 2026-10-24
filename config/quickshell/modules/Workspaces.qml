@@ -18,13 +18,7 @@ Row {
     spacing: 0
 
     function focusWorkspace(id) {
-        // Hyprland 0.5x can run a Lua config, in which case dispatch requests
-        // are Lua rather than the classic "workspace N" command.
-        if (Hyprland.usingLua) {
-            Hyprland.dispatch('hl.dsp.focus({workspace="' + id + '"})');
-        } else {
-            Hyprland.dispatch("workspace " + id);
-        }
+        Hyprland.dispatch("workspace " + id);
     }
 
     Repeater {
