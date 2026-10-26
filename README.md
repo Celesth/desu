@@ -97,7 +97,8 @@ IPC state.
 Edit the installed settings at `~/.config/desu/config`. The repository
 template is `config/desu/config`. Useful options include:
 
-- `DESU_BAR_EDGE`, `DESU_BAR_HEIGHT`, and `DESU_FONT`
+- `DESU_BAR_EDGE`, `DESU_BAR_STYLE`, `DESU_BAR_HEIGHT`, and `DESU_FONT`
+- `DESU_BAR_STYLE` supports `classic`, `compact`, `minimal`, `squircle`, and `detached`.
 - `DESU_WALLPAPER_DIR` and `DESU_WALLPAPER_BACKEND`
 - `DESU_RECORDER_BACKEND`, `DESU_RECORDER_OUTPUT_DIR`, and `DESU_RECORDER_FPS`
 

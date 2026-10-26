@@ -23,7 +23,7 @@ fi
 
 for file in install.sh uninstall.sh config/scripts/desu-lib.sh \
     config/scripts/desu-clipboard config/scripts/desu-recorder \
-    config/scripts/desu-wallpaper; do
+    config/scripts/desu-wallpaper config/scripts/desu-bar-settings; do
     bash -n "$file"
 done
 

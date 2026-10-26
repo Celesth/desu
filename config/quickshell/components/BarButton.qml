@@ -12,7 +12,7 @@ Rectangle {
 
     signal clicked()
 
-    implicitWidth: labelText.implicitWidth + 16
+    implicitWidth: labelText.implicitWidth + Settings.barPadding
     implicitHeight: Settings.barHeight
     color: root.active ? Theme.elevated : (mouse.containsMouse ? Theme.surface : "transparent")
     border.width: root.active ? Theme.borderWidth : 0

@@ -22,8 +22,8 @@ PanelWindow {
         right: true
     }
     margins {
-        top: Settings.barEdge === "top" ? Settings.barMargin + Settings.barHeight : 0
-        bottom: Settings.barEdge === "bottom" ? Settings.barMargin + Settings.barHeight : 0
+        top: Settings.barEdge === "top" ? Settings.barMargin + Settings.barPanelHeight : 0
+        bottom: Settings.barEdge === "bottom" ? Settings.barMargin + Settings.barPanelHeight : 0
         right: 8
     }
 

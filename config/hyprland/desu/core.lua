@@ -30,6 +30,14 @@ hl.config({
 	},
 })
 
+hl.animation({
+	leaf = "workspaces",
+	enabled = true,
+	speed = 3,
+	bezier = "default",
+	style = "slidefade 20%",
+})
+
 hl.env("TERMINAL", terminal)
 hl.env("XDG_CURRENT_DESKTOP", "Hyprland")
 hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" })

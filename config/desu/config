@@ -8,6 +8,7 @@
 
 # --- bar ---
 DESU_BAR_EDGE="top"          # top or bottom
+DESU_BAR_STYLE="classic"     # classic, compact, minimal, squircle, or detached
 DESU_BAR_HEIGHT=28
 DESU_BAR_MARGIN=0
 DESU_FONT="Iosevka Nerd Font"

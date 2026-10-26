@@ -19,7 +19,7 @@ Rectangle {
             + (player.trackTitle || player.identity || "MPRIS"))
         : ""
 
-    visible: player !== null
+    visible: Settings.barStyle !== "minimal" && player !== null
     implicitWidth: visible ? Math.min(300, titleText.implicitWidth + 102) : 0
     implicitHeight: Settings.barHeight
     color: mouse.containsMouse ? Theme.surface : "transparent"

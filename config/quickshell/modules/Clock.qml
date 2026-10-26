@@ -9,7 +9,7 @@ Item {
 
     readonly property bool hovered: mouse.containsMouse
     implicitHeight: Settings.barHeight
-    implicitWidth: Math.max(timeText.implicitWidth, dateText.implicitWidth) + 16
+    implicitWidth: Math.max(timeText.implicitWidth, dateText.implicitWidth) + Settings.barPadding
 
     SystemClock {
         id: clock

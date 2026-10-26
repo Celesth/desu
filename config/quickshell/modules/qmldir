@@ -1,6 +1,7 @@
 module modules
 
 Bar 1.0 Bar.qml
+BarSettings 1.0 BarSettings.qml
 WallpaperSelector 1.0 WallpaperSelector.qml
 Workspaces 1.0 Workspaces.qml
 ActiveWindow 1.0 ActiveWindow.qml

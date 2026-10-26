@@ -11,9 +11,9 @@ PanelWindow {
 
     readonly property string screenName: bar.screen ? bar.screen.name : ""
 
-    color: Theme.background
-    implicitHeight: Settings.barHeight
-    exclusiveZone: Settings.barHeight + Settings.barMargin
+    color: "transparent"
+    implicitHeight: Settings.barPanelHeight
+    exclusiveZone: Settings.barPanelHeight + Settings.barMargin
     aboveWindows: true
     focusable: true
 
@@ -26,17 +26,26 @@ PanelWindow {
     margins {
         top: Settings.barEdge === "top" ? Settings.barMargin : 0
         bottom: Settings.barEdge === "bottom" ? Settings.barMargin : 0
-        left: 0
-        right: 0
+        left: Settings.barSideInset
+        right: Settings.barSideInset
     }
 
     WlrLayershell.namespace: "desu-bar"
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-    Column {
+    Rectangle {
         anchors.fill: parent
-        spacing: 0
+        anchors.topMargin: Settings.barInset
+        anchors.bottomMargin: Settings.barInset
+        color: Settings.barStyle === "compact" ? Theme.surface : Theme.background
+        radius: Settings.barRadius
+        border.width: Settings.barRadius > 0 ? Theme.borderWidth : 0
+        border.color: Theme.border
+
+        Column {
+            anchors.fill: parent
+            spacing: 0
 
         RowLayout {
             width: parent.width
@@ -49,6 +58,7 @@ PanelWindow {
             }
 
             Rectangle {
+                visible: Settings.barStyle === "classic"
                 Layout.preferredWidth: 1
                 Layout.fillHeight: true
                 Layout.topMargin: 5
@@ -57,12 +67,13 @@ PanelWindow {
             }
 
             ActiveWindow {
+                visible: Settings.barStyle !== "minimal"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
             }
 
             Text {
-                visible: Desktop.message.length > 0
+                visible: Settings.barStyle !== "minimal" && Desktop.message.length > 0
                 text: Desktop.message
                 color: Desktop.messageIsError ? Theme.text : Theme.textMuted
                 font.family: Settings.fontFamily
@@ -82,6 +93,13 @@ PanelWindow {
                 AudioButton {}
 
                 BarButton {
+                    label: "⚙"
+                    active: Settings.barSettingsOpen
+                    tooltip: "BAR SETTINGS"
+                    onClicked: Settings.toggleBarSettings()
+                }
+
+                BarButton {
                     label: Notifications.count > 0 ? "NOTE " + Notifications.count : "NOTE"
                     active: Notifications.open
                     dimmed: Notifications.count === 0
@@ -91,6 +109,6 @@ PanelWindow {
                 Clock {}
             }
         }
-
     }
+}
 }

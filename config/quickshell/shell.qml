@@ -29,6 +29,7 @@ ShellRoot {
     }
 
     WallpaperSelector {}
+    BarSettings {}
 
     // This is the control surface used by the `desu` CLI through
     // `quickshell ipc --pid <pid> call desu ...`. Quickshell owns the socket,

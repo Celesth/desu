@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Persist the two bar settings changed by the in-shell settings panel.
+
+set -euo pipefail
+
+config=${1:-}
+edge=${2:-}
+style=${3:-}
+
+[[ -n $config && -n $edge && -n $style ]] || {
+    printf '%s\n' 'usage: desu-bar-settings CONFIG_FILE EDGE STYLE' >&2
+    exit 2
+}
+
+case "$edge" in
+    top|bottom) ;;
+    *) printf 'invalid bar edge: %s\n' "$edge" >&2; exit 2 ;;
+esac
+
+case "$style" in
+    classic|compact|minimal|squircle|detached) ;;
+    *) printf 'invalid bar style: %s\n' "$style" >&2; exit 2 ;;
+esac
+
+directory=$(dirname -- "$config")
+mkdir -p -- "$directory"
+tmp=$(mktemp "${config}.tmp.XXXXXX")
+trap 'rm -f -- "$tmp"' EXIT
+
+if [[ -r $config ]]; then
+    awk -v edge="$edge" -v style="$style" '
+        BEGIN { edge_set = 0; style_set = 0 }
+        /^DESU_BAR_EDGE=/ {
+            print "DESU_BAR_EDGE=\"" edge "\""
+            edge_set = 1
+            next
+        }
+        /^DESU_BAR_STYLE=/ {
+            print "DESU_BAR_STYLE=\"" style "\""
+            style_set = 1
+            next
+        }
+        { print }
+        END {
+            if (!edge_set) print "DESU_BAR_EDGE=\"" edge "\""
+            if (!style_set) print "DESU_BAR_STYLE=\"" style "\""
+        }
+    ' "$config" >"$tmp"
+else
+    printf 'DESU_BAR_EDGE="%s"\nDESU_BAR_STYLE="%s"\n' "$edge" "$style" >"$tmp"
+fi
+
+chmod --reference="$config" "$tmp" 2>/dev/null || chmod 644 "$tmp"
+mv -f -- "$tmp" "$config"

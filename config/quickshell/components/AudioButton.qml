@@ -6,7 +6,7 @@ import "../services"
 Rectangle {
     id: root
 
-    implicitWidth: Math.max(64, labelText.implicitWidth + 16)
+    implicitWidth: Math.max(64, labelText.implicitWidth + Settings.barPadding)
     implicitHeight: Settings.barHeight
     color: mouse.containsMouse ? Theme.surface : "transparent"
     radius: 0

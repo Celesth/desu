@@ -12,7 +12,7 @@ Row {
     property var barWindow
     property bool atBottom: Settings.barEdge === "bottom"
     spacing: 0
-    visible: SystemTray.items.values.length > 0
+    visible: Settings.barStyle !== "minimal" && SystemTray.items.values.length > 0
 
     Repeater {
         model: SystemTray.items
