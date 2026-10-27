@@ -1,5 +1,6 @@
 hl.on("hyprland.start", function()
 	hl.exec_cmd("desu start")
 	hl.exec_cmd("pgrep -x awww-daemon >/dev/null 2>&1 || (awww-daemon >/dev/null 2>&1 &)")
+	hl.exec_cmd("pgrep -x hypridle >/dev/null 2>&1 || (hypridle -c \"$HOME/.config/hypr/hypridle.conf\" >/dev/null 2>&1 &)")
 	hl.exec_cmd("sleep 1 && desu wallpaper restore >/dev/null 2>&1 || true")
 end)

@@ -26,6 +26,9 @@ hl.bind(main .. " + A", command("desu audio"), { description = "Open audio mixer
 hl.bind(main .. " + N", command("desu ipc call desu notificationToggle"), {
 	description = "Toggle notifications",
 })
+hl.bind(main .. " + CTRL + BACKSPACE", command("desu ipc call desu powerToggle"), {
+	description = "Open power menu",
+})
 hl.bind(main .. " + SHIFT + S", command("desu screenshot region"), {
 	description = "Take a screenshot",
 })

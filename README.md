@@ -16,6 +16,10 @@ clipboard history, wallpaper selection, audio controls, and screen recording.
 - Wallpaper management through `awww` with a clickable selector and restore
   support.
 - Screen recording with `gpu-screen-recorder` or `wf-recorder` fallback.
+- Android-style rounded power menu with lock, suspend, restart, and shutdown.
+- Automatic idle locking through `hypridle` and a matching `hyprlock` screen.
+- Live system monitor popup with CPU, RAM, GPU, disk, temperature, load, and uptime.
+- Persistent theme picker with MONO, EMBER, and ICE palettes.
 - Modular Lua Hyprland configuration with `SUPER` as the main modifier.
 - Matching Kitty, btop, Starship, and Fastfetch configuration.
 
@@ -28,6 +32,7 @@ Required:
 - Quickshell
 - `fuzzel`, `wl-clipboard`, and `cliphist`
 - `awww` and `awww-daemon`
+- `hypridle` and `hyprlock`
 - `kitty` and `starship`
 
 Optional integrations are detected automatically: `pavucontrol`,
@@ -69,6 +74,7 @@ hyprctl reload
 | `SUPER + N` | Toggle notifications |
 | `SUPER + A` | Open audio mixer |
 | `SUPER + R` | Toggle screen recording |
+| `CTRL + SUPER + Backspace` | Open power menu |
 | `SUPER + Shift + K` | Terminate the focused window |
 | `SUPER + mouse wheel` | Change workspace |
 | `SUPER + Alt + mouse wheel` | Move the focused window between workspaces |

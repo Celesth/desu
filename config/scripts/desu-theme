@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+state_file=${1:-}
+theme=${2:-}
+
+[[ -n $state_file && -n $theme ]] || {
+    printf '%s\n' 'usage: desu-theme STATE_FILE THEME' >&2
+    exit 2
+}
+
+case "${theme^^}" in
+    MONO|EMBER|ICE) theme=${theme^^} ;;
+    *) printf 'invalid theme: %s\n' "$theme" >&2; exit 2 ;;
+esac
+
+mkdir -p -- "$(dirname -- "$state_file")"
+tmp=$(mktemp "${state_file}.tmp.XXXXXX")
+trap 'rm -f -- "$tmp"' EXIT
+printf '%s\n' "$theme" >"$tmp"
+mv -f -- "$tmp" "$state_file"

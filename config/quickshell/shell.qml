@@ -30,6 +30,9 @@ ShellRoot {
 
     WallpaperSelector {}
     BarSettings {}
+    PowerMenu {}
+    SystemMonitorPanel {}
+    ThemePicker {}
 
     // This is the control surface used by the `desu` CLI through
     // `quickshell ipc --pid <pid> call desu ...`. Quickshell owns the socket,
@@ -48,7 +51,10 @@ ShellRoot {
                 pid: Quickshell.processId,
                 screens: Quickshell.screens.length,
                 recorder: Recorder.state,
-                wallpaperSelector: Wallpapers.open
+                wallpaperSelector: Wallpapers.open,
+                systemMonitor: SystemMonitor.open,
+                theme: Theme.name,
+                themePicker: Theme.pickerOpen
             });
         }
 
@@ -85,6 +91,36 @@ ShellRoot {
         function notificationClose(): string {
             Notifications.closePanel();
             return "ok";
+        }
+
+        function powerToggle(): string {
+            Power.toggle();
+            return "ok";
+        }
+
+        function powerOpen(): string {
+            Power.show();
+            return "ok";
+        }
+
+        function powerClose(): string {
+            Power.hide();
+            return "ok";
+        }
+
+        function systemMonitorToggle(): string {
+            SystemMonitor.open = !SystemMonitor.open;
+            return "ok";
+        }
+
+        function themeToggle(): string {
+            Theme.togglePicker();
+            return "ok";
+        }
+
+        function themeApply(name: string): string {
+            Theme.apply(name, true);
+            return Theme.name;
         }
 
         function wallpaperApply(path: string): string {

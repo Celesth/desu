@@ -7,3 +7,6 @@ Workspaces 1.0 Workspaces.qml
 ActiveWindow 1.0 ActiveWindow.qml
 Clock 1.0 Clock.qml
 NotificationPanel 1.0 NotificationPanel.qml
+PowerMenu 1.0 PowerMenu.qml
+SystemMonitorPanel 1.0 SystemMonitorPanel.qml
+ThemePicker 1.0 ThemePicker.qml

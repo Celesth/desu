@@ -7,3 +7,5 @@ singleton AudioService AudioService.qml
 singleton Recorder Recorder.qml
 singleton Wallpapers Wallpapers.qml
 singleton Notifications Notifications.qml
+singleton Power Power.qml
+singleton SystemMonitor SystemMonitor.qml

@@ -240,8 +240,16 @@ if (( INSTALL_HYPRLAND )); then
     backup_path "$HYPRLAND_TARGET"
     mkdir -p "$(dirname -- "$HYPRLAND_TARGET")"
     install -m 644 "${PAYLOAD_SOURCE}/hyprland/hyprland.lua" "$HYPRLAND_TARGET"
+    HYPRIDLE_TARGET="${XDG_CONFIG_HOME}/hypr/hypridle.conf"
+    HYPRLOCK_TARGET="${XDG_CONFIG_HOME}/hypr/hyprlock.conf"
+    backup_path "$HYPRIDLE_TARGET"
+    backup_path "$HYPRLOCK_TARGET"
+    install -m 644 "${PAYLOAD_SOURCE}/hyprland/hypridle.conf" "$HYPRIDLE_TARGET"
+    install -m 644 "${PAYLOAD_SOURCE}/hyprland/hyprlock.conf" "$HYPRLOCK_TARGET"
     printf 'hyprland: %s\n' "$HYPRLAND_TARGET"
     printf 'hyprland modules: %s\n' "$HYPRLAND_MODULE_TARGET"
+    printf 'hypridle: %s\n' "$HYPRIDLE_TARGET"
+    printf 'hyprlock: %s\n' "$HYPRLOCK_TARGET"
 fi
 
 printf 'installed DESU %s\n' "$(head -n 1 "${ROOT}/VERSION")"
