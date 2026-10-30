@@ -84,49 +84,55 @@ install -m 644 "${ROOT}/VERSION" "${CONFIG_TARGET}/VERSION"
 chmod 700 "$CONFIG_TARGET/scripts" 2>/dev/null || true
 find "$CONFIG_TARGET/scripts" -type f -exec chmod 755 {} +
 
-install_desu_themes() {
+install_matugen() {
+    local matugen_dir="${XDG_CONFIG_HOME}/matugen"
+    local matugen_config="${matugen_dir}/config.toml"
     local kitty_dir="${XDG_CONFIG_HOME}/kitty"
     local kitty_conf="${kitty_dir}/kitty.conf"
     local btop_dir="${XDG_CONFIG_HOME}/btop"
     local btop_conf="${btop_dir}/btop.conf"
     local btop_theme="${btop_dir}/themes/desu.theme"
 
-    if [[ -f ${PAYLOAD_SOURCE}/kitty/desu-colors.conf ]]; then
-        mkdir -p "$kitty_dir"
-        install -m 644 "${PAYLOAD_SOURCE}/kitty/desu-colors.conf" \
-            "${kitty_dir}/desu-colors.conf"
-        if [[ -f $kitty_conf ]] && ! grep -Fqx 'include desu-colors.conf' "$kitty_conf"; then
-            backup_path "$kitty_conf"
-            cat "$BACKUP_PATH" >"$kitty_conf"
-            printf '\ninclude desu-colors.conf\n' >>"$kitty_conf"
-        elif [[ ! -f $kitty_conf ]]; then
-            printf 'include desu-colors.conf\n' >"$kitty_conf"
-        fi
+    [[ -f ${PAYLOAD_SOURCE}/matugen/config.toml ]] || return 0
+    mkdir -p "${matugen_dir}/templates"
+    if [[ -f $matugen_config ]] && ! cmp -s "${PAYLOAD_SOURCE}/matugen/config.toml" "$matugen_config"; then
+        backup_path "$matugen_config"
+    fi
+    install -m 644 "${PAYLOAD_SOURCE}/matugen/config.toml" "$matugen_config"
+    for template in "${PAYLOAD_SOURCE}/matugen/templates"/*; do
+        [[ -f $template ]] || continue
+        install -m 644 "$template" "${matugen_dir}/templates/$(basename -- "$template")"
+    done
+
+    mkdir -p "$kitty_dir"
+    if [[ -f $kitty_conf ]] && ! grep -Fqx 'include desu-colors.conf' "$kitty_conf"; then
+        backup_path "$kitty_conf"
+        cat "$BACKUP_PATH" >"$kitty_conf"
+        printf '\ninclude desu-colors.conf\n' >>"$kitty_conf"
+    elif [[ ! -f $kitty_conf ]]; then
+        printf 'include desu-colors.conf\n' >"$kitty_conf"
     fi
 
-    if [[ -f ${PAYLOAD_SOURCE}/btop/themes/desu.theme ]]; then
-        mkdir -p "${btop_dir}/themes"
-        install -m 644 "${PAYLOAD_SOURCE}/btop/themes/desu.theme" "$btop_theme"
-        if [[ -f $btop_conf ]] && ! grep -Fq "color_theme = \"$btop_theme\"" "$btop_conf"; then
-            backup_path "$btop_conf"
-            awk -v theme="$btop_theme" '
-                /^color_theme[[:space:]]*=/ {
-                    print "color_theme = \"" theme "\""
-                    replaced = 1
-                    next
-                }
-                { print }
-                END {
-                    if (!replaced) print "color_theme = \"" theme "\""
-                }
-            ' "$BACKUP_PATH" >"$btop_conf"
-        elif [[ ! -f $btop_conf ]]; then
-            printf 'color_theme = "%s"\n' "$btop_theme" >"$btop_conf"
-        fi
+    mkdir -p "${btop_dir}/themes"
+    if [[ -f $btop_conf ]] && ! grep -Fq "color_theme = \"$btop_theme\"" "$btop_conf"; then
+        backup_path "$btop_conf"
+        awk -v theme="$btop_theme" '
+            /^color_theme[[:space:]]*=/ {
+                print "color_theme = \"" theme "\""
+                replaced = 1
+                next
+            }
+            { print }
+            END {
+                if (!replaced) print "color_theme = \"" theme "\""
+            }
+        ' "$BACKUP_PATH" >"$btop_conf"
+    elif [[ ! -f $btop_conf ]]; then
+        printf 'color_theme = "%s"\n' "$btop_theme" >"$btop_conf"
     fi
 }
 
-install_desu_themes
+install_matugen
 
 install_starship() {
     local starship_target="${XDG_CONFIG_HOME}/starship.toml"
@@ -230,6 +236,19 @@ printf '%s\n' "$CONFIG_TARGET" >"$COMMAND_CONFIG"
 chmod 600 "$COMMAND_CONFIG"
 
 printf '%s\n' "$ROOT" >"${CONFIG_TARGET}/.source"
+
+generate_matugen() {
+    local wallpaper_state="${XDG_STATE_HOME}/desu/wallpaper"
+    local wallpaper
+    command -v matugen >/dev/null 2>&1 || return 0
+    [[ -r $wallpaper_state ]] || return 0
+    wallpaper=$(sed -n '1p' "$wallpaper_state")
+    [[ -f $wallpaper ]] || return 0
+    matugen image "$wallpaper" --source-color-index 0 --mode dark --quiet ||
+        printf '%s\n' 'warning: Matugen could not generate the current palette' >&2
+}
+
+generate_matugen
 
 if (( INSTALL_HYPRLAND )); then
     HYPRLAND_TARGET="${XDG_CONFIG_HOME}/hypr/hyprland.lua"

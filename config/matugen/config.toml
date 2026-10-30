@@ -1,0 +1,19 @@
+[config]
+reload_apps = true
+
+[config.wallpaper]
+set = false
+command = "true"
+arguments = []
+
+[templates.desu_colors]
+input_path = '~/.config/matugen/templates/desu-colors.json'
+output_path = '~/.cache/desu/matugen/colors.json'
+
+[templates.kitty]
+input_path = '~/.config/matugen/templates/kitty.conf'
+output_path = '~/.config/kitty/desu-colors.conf'
+
+[templates.btop]
+input_path = '~/.config/matugen/templates/btop.theme'
+output_path = '~/.config/btop/themes/desu.theme'

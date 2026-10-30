@@ -120,13 +120,6 @@ PanelWindow {
                     onClicked: SystemMonitor.open = !SystemMonitor.open
                 }
 
-                BarButton {
-                    label: "THEME"
-                    active: Theme.pickerOpen
-                    tooltip: "THEME PICKER"
-                    onClicked: Theme.togglePicker()
-                }
-
                 Clock {}
             }
         }

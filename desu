@@ -413,6 +413,11 @@ cmd_doctor() {
         bad "wallpaper helper missing"
     fi
     [[ -d $DESU_WALLPAPER_DIR ]] && ok "wallpaper dir: ${DESU_WALLPAPER_DIR}" || opt "wallpaper dir missing: ${DESU_WALLPAPER_DIR}"
+    if desu_have matugen; then
+        ok "matugen: installed"
+    else
+        bad "matugen is not installed (wallpaper colors will not update)"
+    fi
     if desu_have magick || desu_have convert; then
         ok "ImageMagick available for thumbnails"
     else

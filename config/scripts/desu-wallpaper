@@ -68,6 +68,13 @@ hyprpaper_ready() {
     desu_have hyprpaper && desu_have hyprctl && hyprctl hyprpaper listloaded >/dev/null 2>&1
 }
 
+apply_matugen() {
+    local path=$1
+    desu_have matugen || return 0
+    matugen image "$path" --source-color-index 0 --mode dark --quiet ||
+        printf '%s: warning: matugen could not generate a palette for %s\n' "$PROG" "$path" >&2
+}
+
 choose_backend() {
     local wanted=${DESU_WALLPAPER_BACKEND:-auto}
     case "$wanted" in
@@ -113,6 +120,7 @@ apply_path() {
     esac
 
     printf '%s\n%s\n' "$path" "$backend" >"$DESU_WALLPAPER_STATE"
+    apply_matugen "$path"
     printf 'wallpaper set (%s): %s\n' "$backend" "$path"
 }
 

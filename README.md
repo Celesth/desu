@@ -19,7 +19,7 @@ clipboard history, wallpaper selection, audio controls, and screen recording.
 - Android-style rounded power menu with lock, suspend, restart, and shutdown.
 - Automatic idle locking through `hypridle` and a matching `hyprlock` screen.
 - Live system monitor popup with CPU, RAM, GPU, disk, temperature, load, and uptime.
-- Persistent theme picker with MONO, EMBER, and ICE palettes.
+- Wallpaper-derived Matugen colors shared by Quickshell, Kitty, and btop.
 - Modular Lua Hyprland configuration with `SUPER` as the main modifier.
 - Matching Kitty, btop, Starship, and Fastfetch configuration.
 
@@ -33,7 +33,7 @@ Required:
 - `fuzzel`, `wl-clipboard`, and `cliphist`
 - `awww` and `awww-daemon`
 - `hypridle` and `hyprlock`
-- `kitty` and `starship`
+- `kitty`, `matugen`, and `starship`
 
 Optional integrations are detected automatically: `pavucontrol`,
 `gpu-screen-recorder`, `wf-recorder`, ImageMagick, `playerctl`, and
@@ -117,6 +117,10 @@ config/hyprland/desu/lifecycle.lua startup and wallpaper restoration
 config/hyprland/desu/bindings.lua  keyboard and mouse bindings
 config/hyprland/desu/rules.lua     window rules
 ```
+
+Changing the wallpaper also regenerates the Matugen palette. The generated
+Quickshell palette is stored in `~/.cache/desu/matugen/colors.json`, while
+Kitty and btop receive generated theme files in their normal config paths.
 
 ## Development
 
