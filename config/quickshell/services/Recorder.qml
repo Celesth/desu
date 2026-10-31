@@ -18,6 +18,10 @@ Singleton {
     property int pid: 0
     property int started: 0
     property int elapsed: 0
+    property bool settingsOpen: false
+    property string configuredBackend: Settings.recorderBackend
+    property int configuredFps: Settings.recorderFps
+    property bool configuredAudio: Settings.recorderAudio
 
     readonly property string elapsedText: {
         const s = root.elapsed;
@@ -62,6 +66,20 @@ Singleton {
     function start() { call("start"); }
     function stop() { call("stop"); }
     function toggle() { call(root.active ? "stop" : "start"); }
+    function toggleSettings() { root.settingsOpen = !root.settingsOpen; }
+    function closeSettings() { root.settingsOpen = false; }
+
+    function saveSettings(backend, fps, audio) {
+        if (settingsProc.running) return;
+        settingsProc.command = [
+            Settings.scriptsDir + "/desu-recorder-settings",
+            Settings.desuConfigHome + "/config",
+            backend,
+            String(fps),
+            audio ? "1" : "0"
+        ];
+        settingsProc.running = true;
+    }
 
     FileView {
         id: stateFile
@@ -93,6 +111,22 @@ Singleton {
             const text = (code === 0 ? actionOut.text : actionErr.text).trim();
             if (text.length > 0) Desktop.notify(text, code !== 0);
             if (code === 0) stateFile.reload();
+        }
+    }
+
+    Process {
+        id: settingsProc
+        stdout: StdioCollector { id: settingsOut }
+        stderr: StdioCollector { id: settingsErr }
+        onExited: (code) => {
+            if (code === 0) {
+                configuredBackend = settingsProc.command[2];
+                configuredFps = parseInt(settingsProc.command[3]) || configuredFps;
+                configuredAudio = settingsProc.command[4] === "1";
+                root.settingsOpen = false;
+            } else {
+                Desktop.notify((settingsErr.text || "could not save recorder settings").trim(), true);
+            }
         }
     }
 }

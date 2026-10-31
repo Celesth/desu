@@ -15,11 +15,12 @@ clipboard history, wallpaper selection, audio controls, and screen recording.
 - Clipboard history through `cliphist` and `wl-clipboard`.
 - Wallpaper management through `awww` with a clickable selector and restore
   support.
-- Screen recording with `gpu-screen-recorder` or `wf-recorder` fallback.
+- Small bar recorder control using `wf-recorder` at 30 FPS by default; right-click to configure.
 - Android-style rounded power menu with lock, suspend, restart, and shutdown.
 - Automatic idle locking through `hypridle` and a matching `hyprlock` screen.
 - Live system monitor popup with CPU, RAM, GPU, disk, temperature, load, and uptime.
 - Wallpaper-derived Matugen colors shared by Quickshell, Kitty, and btop.
+- Compositor blur, translucent application surfaces, and optional game tearing.
 - Modular Lua Hyprland configuration with `SUPER` as the main modifier.
 - Matching Kitty, btop, Starship, and Fastfetch configuration.
 

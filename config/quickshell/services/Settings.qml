@@ -53,6 +53,9 @@ Singleton {
 
     readonly property string wallpaperDir: env("DESU_WALLPAPER_DIR", root.home + "/Pictures/Wallpapers")
     readonly property string recorderOutputDir: env("DESU_RECORDER_OUTPUT_DIR", root.home + "/Videos/Recordings")
+    readonly property string recorderBackend: env("DESU_RECORDER_BACKEND", "wf-recorder")
+    readonly property int recorderFps: Math.max(1, envInt("DESU_RECORDER_FPS", 30))
+    readonly property bool recorderAudio: envInt("DESU_RECORDER_AUDIO", 1) === 1
     readonly property string stateDir: env("DESU_STATE_HOME", root.stateHome + "/desu")
 
     property bool barSettingsOpen: false

@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Persist recorder settings changed by the bar's right-click panel.
+
+set -euo pipefail
+
+config=${1:-}
+backend=${2:-}
+fps=${3:-}
+audio=${4:-}
+
+[[ -n $config && -n $backend && -n $fps && -n $audio ]] || {
+    printf '%s\n' 'usage: desu-recorder-settings CONFIG_FILE BACKEND FPS AUDIO' >&2
+    exit 2
+}
+
+case "$backend" in
+    auto|wf-recorder|gpu-screen-recorder) ;;
+    *) printf 'invalid recorder backend: %s\n' "$backend" >&2; exit 2 ;;
+esac
+
+[[ $fps =~ ^[0-9]+$ && $fps -ge 1 && $fps -le 240 ]] || {
+    printf 'invalid recorder FPS: %s\n' "$fps" >&2
+    exit 2
+}
+
+case "$audio" in
+    0|1) ;;
+    *) printf 'invalid recorder audio flag: %s\n' "$audio" >&2; exit 2 ;;
+esac
+
+directory=$(dirname -- "$config")
+mkdir -p -- "$directory"
+tmp=$(mktemp "${config}.tmp.XXXXXX")
+trap 'rm -f -- "$tmp"' EXIT
+
+if [[ -r $config ]]; then
+    awk -v backend="$backend" -v fps="$fps" -v audio="$audio" '
+        BEGIN { backend_set = 0; fps_set = 0; audio_set = 0 }
+        /^DESU_RECORDER_BACKEND=/ {
+            print "DESU_RECORDER_BACKEND=\"" backend "\""
+            backend_set = 1
+            next
+        }
+        /^DESU_RECORDER_FPS=/ {
+            print "DESU_RECORDER_FPS=" fps
+            fps_set = 1
+            next
+        }
+        /^DESU_RECORDER_AUDIO=/ {
+            print "DESU_RECORDER_AUDIO=" audio
+            audio_set = 1
+            next
+        }
+        { print }
+        END {
+            if (!backend_set) print "DESU_RECORDER_BACKEND=\"" backend "\""
+            if (!fps_set) print "DESU_RECORDER_FPS=" fps
+            if (!audio_set) print "DESU_RECORDER_AUDIO=" audio
+        }
+    ' "$config" >"$tmp"
+else
+    printf 'DESU_RECORDER_BACKEND="%s"\nDESU_RECORDER_FPS=%s\nDESU_RECORDER_AUDIO=%s\n' \
+        "$backend" "$fps" "$audio" >"$tmp"
+fi
+
+chmod --reference="$config" "$tmp" 2>/dev/null || chmod 644 "$tmp"
+mv -f -- "$tmp" "$config"

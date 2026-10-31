@@ -15,3 +15,25 @@ hl.window_rule({
 	match = { class = pavucontrol_class },
 	center = true,
 })
+
+hl.window_rule({
+	name = "desu_game_tearing",
+	match = { content = "game" },
+	immediate = true,
+})
+
+hl.layer_rule({
+	name = "desu_translucent_layers",
+	match = { namespace = "^desu-" },
+	blur = true,
+	blur_popups = true,
+	ignore_alpha = 0.2,
+})
+
+hl.layer_rule({
+	name = "fuzzel_translucent_layer",
+	match = { namespace = "^fuzzel$" },
+	blur = true,
+	blur_popups = true,
+	ignore_alpha = 0.2,
+})

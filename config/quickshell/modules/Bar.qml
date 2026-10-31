@@ -92,6 +92,8 @@ PanelWindow {
 
                 AudioButton {}
 
+                RecorderButton {}
+
                 BarButton {
                     label: "⚙"
                     active: Settings.barSettingsOpen

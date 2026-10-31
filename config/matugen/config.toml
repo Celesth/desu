@@ -17,3 +17,11 @@ output_path = '~/.config/kitty/desu-colors.conf'
 [templates.btop]
 input_path = '~/.config/matugen/templates/btop.theme'
 output_path = '~/.config/btop/themes/desu.theme'
+
+[templates.starship]
+input_path = '~/.config/matugen/templates/starship.toml'
+output_path = '~/.config/starship.toml'
+
+[templates.fuzzel]
+input_path = '~/.config/matugen/templates/fuzzel.ini'
+output_path = '~/.config/desu/fuzzel/fuzzel.ini'

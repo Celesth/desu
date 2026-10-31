@@ -33,7 +33,7 @@ PanelWindow {
 
     visible: Wallpapers.open
     screen: Desktop.focusedScreen
-    color: "#202020CC"
+    color: Theme.background
     exclusiveZone: 0
     exclusionMode: ExclusionMode.Ignore
     aboveWindows: true

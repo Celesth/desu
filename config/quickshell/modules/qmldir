@@ -9,3 +9,5 @@ Clock 1.0 Clock.qml
 NotificationPanel 1.0 NotificationPanel.qml
 PowerMenu 1.0 PowerMenu.qml
 SystemMonitorPanel 1.0 SystemMonitorPanel.qml
+RecorderButton 1.0 RecorderButton.qml
+RecorderSettings 1.0 RecorderSettings.qml

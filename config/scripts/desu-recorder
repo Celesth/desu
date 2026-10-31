@@ -288,7 +288,7 @@ usage: desu-recorder <start|stop|toggle|status|backends>
 Environment / ~/.config/desu/config:
   DESU_RECORDER_BACKEND      auto, gpu-screen-recorder, or wf-recorder
   DESU_RECORDER_OUTPUT_DIR   output directory
-  DESU_RECORDER_FPS          frame rate (default 60)
+  DESU_RECORDER_FPS          frame rate (default 30)
   DESU_RECORDER_AUDIO        1 to capture desktop audio, 0 to disable
   DESU_RECORDER_QUALITY      gpu-screen-recorder quality
   DESU_RECORDER_OPTIONS      extra backend arguments (advanced)

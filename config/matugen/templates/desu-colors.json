@@ -1,13 +1,13 @@
 {
   "name": "MATUGEN",
-  "background": "{{colors.background.dark.hex}}",
-  "surface": "{{colors.surface_container_low.dark.hex}}",
-  "elevated": "{{colors.surface_container.dark.hex}}",
+  "background": "#c8{{colors.background.dark.hex_stripped}}",
+  "surface": "#e8{{colors.surface_container_low.dark.hex_stripped}}",
+  "elevated": "#f0{{colors.surface_container.dark.hex_stripped}}",
   "border": "{{colors.outline.dark.hex}}",
   "text": "{{colors.on_background.dark.hex}}",
   "textSecondary": "{{colors.on_surface_variant.dark.hex}}",
   "textMuted": "{{colors.outline_variant.dark.hex}}",
-  "selection": "{{colors.primary_container.dark.hex}}",
+  "selection": "#f0{{colors.primary_container.dark.hex_stripped}}",
   "accent": "{{colors.primary.dark.hex}}",
   "accentText": "{{colors.on_primary.dark.hex}}",
   "errorColor": "{{colors.error.dark.hex}}"

@@ -6,11 +6,21 @@ hl.config({
 		gaps_out = 6,
 		border_size = 1,
 		layout = "dwindle",
-		allow_tearing = false,
+		allow_tearing = true,
 	},
 	decoration = {
 		rounding = 0,
-		blur = { enabled = false },
+		active_opacity = 0.96,
+		inactive_opacity = 0.90,
+		fullscreen_opacity = 1.0,
+		blur = {
+			enabled = true,
+			size = 6,
+			passes = 2,
+			new_optimizations = true,
+			ignore_opacity = true,
+			vibrancy = 0.12,
+		},
 		shadow = { enabled = false },
 	},
 	input = {

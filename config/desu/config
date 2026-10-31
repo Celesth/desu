@@ -21,9 +21,9 @@ DESU_WALLPAPER_DIR="$HOME/Pictures/Wallpapers"
 DESU_WALLPAPER_BACKEND="awww" # awww is the DESU wallpaper backend
 
 # --- recorder ---
-DESU_RECORDER_BACKEND="auto"  # auto, gpu-screen-recorder, wf-recorder
+DESU_RECORDER_BACKEND="wf-recorder"  # auto, gpu-screen-recorder, wf-recorder
 DESU_RECORDER_OUTPUT_DIR="$HOME/Videos/Recordings"
-DESU_RECORDER_FPS=60
+DESU_RECORDER_FPS=30
 DESU_RECORDER_AUDIO=1         # 1 = desktop audio, 0 = video only
 DESU_RECORDER_QUALITY="very_high"
 DESU_RECORDER_OPTIONS=""      # advanced: extra backend arguments
