@@ -38,7 +38,7 @@ PanelWindow {
         anchors.fill: parent
         anchors.topMargin: Settings.barInset
         anchors.bottomMargin: Settings.barInset
-        color: Settings.barStyle === "compact" ? Theme.surface : Theme.background
+        color: Qt.rgba(0, 0, 0, 0.004)
         radius: Settings.barRadius
         border.width: Settings.barRadius > 0 ? Theme.borderWidth : 0
         border.color: Theme.border

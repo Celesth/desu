@@ -27,7 +27,7 @@ hl.layer_rule({
 	match = { namespace = "^desu-" },
 	blur = true,
 	blur_popups = true,
-	ignore_alpha = 0.2,
+	ignore_alpha = 0.0,
 })
 
 hl.layer_rule({
