@@ -74,6 +74,10 @@ hl.bind(main .. " + mouse:272", hl.dsp.window.drag(), {
 	mouse = true,
 	description = "Move window with mouse",
 })
+hl.bind(main .. " + mouse:273", hl.dsp.window.resize(), {
+	mouse = true,
+	description = "Resize floating window with mouse",
+})
 
 for index = 1, 10 do
 	local key = index % 10

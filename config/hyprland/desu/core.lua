@@ -43,9 +43,9 @@ hl.config({
 hl.animation({
 	leaf = "workspaces",
 	enabled = true,
-	speed = 3,
+	speed = 2,
 	bezier = "default",
-	style = "slidefade 20%",
+	style = "slidefade 16%",
 })
 
 hl.env("TERMINAL", terminal)

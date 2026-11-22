@@ -46,7 +46,7 @@ Singleton {
     readonly property int barRadius: barStyle === "squircle" ? 14
         : (barStyle === "detached" ? 18 : 0)
     readonly property int barPanelHeight: barHeight + barInset * 2
-    readonly property string fontFamily: env("DESU_FONT", "Iosevka Nerd Font")
+    readonly property string fontFamily: env("DESU_FONT", "JetBrainsMonoNL Nerd Font Mono")
     readonly property int fontSize: Math.max(8, envInt("DESU_FONT_SIZE", 10))
     readonly property string timeFormat: env("DESU_TIME_FORMAT", "HH:mm")
     readonly property string dateFormat: env("DESU_DATE_FORMAT", "ddd dd MMM yyyy")

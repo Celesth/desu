@@ -88,7 +88,7 @@ _desu_defaults() {
     DESU_BAR_STYLE="classic"
     DESU_BAR_HEIGHT=28
     DESU_BAR_MARGIN=0
-    DESU_FONT="Iosevka Nerd Font"
+DESU_FONT="JetBrainsMonoNL Nerd Font Mono"
     DESU_FONT_SIZE=10
     DESU_WALLPAPER_DIR="${HOME}/Pictures/Wallpapers"
     DESU_WALLPAPER_BACKEND="awww"
